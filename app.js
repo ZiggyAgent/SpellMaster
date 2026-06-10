@@ -187,10 +187,6 @@ function fillGradeSelect(sel) {
 fillGradeSelect($("grade-select"));
 fillGradeSelect($("lb-grade-select"));
 
-function updatePracticeLabel() {
-  $("btn-practice").textContent = `🎯 Practice Tricky Words (Grade ${$("grade-select").value})`;
-}
-
 function enterHome(isNew = false) {
   $("home-name").textContent = player.name;
   $("home-new").hidden = !isNew;
@@ -198,14 +194,10 @@ function enterHome(isNew = false) {
   $("btn-admin-feedback").hidden = !player.admin;
   $("grade-select").value = localStorage.getItem(GRADE_KEY) || "1";
   $("tts-note").hidden = canSpeak;
-  updatePracticeLabel();
   show("screen-home");
 }
 
-$("grade-select").addEventListener("change", (e) => {
-  localStorage.setItem(GRADE_KEY, e.target.value);
-  updatePracticeLabel();
-});
+$("grade-select").addEventListener("change", (e) => localStorage.setItem(GRADE_KEY, e.target.value));
 
 // ---------------------------------------------------------------------------
 // Game
@@ -238,12 +230,15 @@ function startGame() {
   nextWordUI();
 }
 
-// Practice mode: drill this player's own tricky words at the selected grade.
-// Unscored, never saved, and a word missed during practice comes back once
-// more at the end.
-async function startPractice() {
+// Practice mode: drill this player's own tricky words. The setup screen shows
+// every grade with its tricky-word count (0 included) and lets the player
+// select any combination of levels, or all of them. Sessions are unscored,
+// never saved, and a word missed during practice comes back once more at the
+// end.
+let practiceData = null; // { all: entries[], byGrade: Map<grade, entries[]>, selected: Set<grade> }
+
+async function openPracticeSetup() {
   $("home-msg").hidden = true;
-  const grade = Number($("grade-select").value);
   try {
     const r = await rpc("spelling", "get_missed_words", { p_player_id: player.id, p_pin: player.pin });
     if (!r.ok) {
@@ -251,35 +246,96 @@ async function startPractice() {
       $("home-msg").hidden = false;
       return;
     }
+    // server returns most-missed first; keep that order for session building
     const all = r.words.map((x) => WORD_INDEX.get(x.word.toLowerCase())).filter(Boolean);
-    const entries = all.filter((e) => e.grade === grade);
-    if (!entries.length) {
-      const others = [...new Set(all.map((e) => e.grade))].sort((a, b) => a - b);
-      $("home-msg").textContent = others.length
-        ? `No tricky words at Grade ${grade}. You have some at Grade ${others.join(", ")} — switch the level above to practice those.`
-        : "No tricky words yet — play a game first! 🎉";
-      $("home-msg").hidden = false;
-      return;
-    }
-    game = {
-      mode: "practice",
-      round: "main",
-      queue: entries.slice(0, 10), // most-missed first (server sorts by miss count)
-      index: 0,
-      results: [],      // { w, s, p, first_try_correct }
-      requeued: new Set(),
-    };
-    $("game-round").textContent = `🎯 Practicing Grade ${grade} words`;
-    $("game-round").hidden = false;
-    $("game-points").hidden = true;
-    $("score-line").hidden = true;
-    show("screen-game");
-    nextWordUI();
+    const byGrade = new Map();
+    for (let g = 1; g <= 12; g++) byGrade.set(g, []);
+    for (const e of all) byGrade.get(e.grade).push(e);
+    // keep the previous selection when it still has words; default to the home grade
+    const prev = practiceData ? [...practiceData.selected] : [Number($("grade-select").value)];
+    const selected = new Set(prev.filter((g) => byGrade.get(g)?.length));
+    practiceData = { all, byGrade, selected };
+    renderPracticeSetup();
+    show("screen-practice-setup");
   } catch {
     $("home-msg").textContent = "Could not reach the game server. Check your internet and try again.";
     $("home-msg").hidden = false;
   }
 }
+
+function renderPracticeSetup() {
+  const { all, byGrade, selected } = practiceData;
+  const withWords = [...byGrade.entries()].filter(([, e]) => e.length).map(([g]) => g);
+  const grid = $("practice-grades");
+  grid.innerHTML = "";
+
+  const allOn = withWords.length > 0 && withWords.every((g) => selected.has(g));
+  const allChip = document.createElement("button");
+  allChip.type = "button";
+  allChip.className = "grade-chip" + (allOn ? " selected" : "");
+  allChip.disabled = withWords.length === 0;
+  allChip.innerHTML = `All levels<span class="cnt">${all.length} word${all.length === 1 ? "" : "s"}</span>`;
+  allChip.addEventListener("click", () => {
+    selected.clear();
+    if (!allOn) withWords.forEach((g) => selected.add(g));
+    renderPracticeSetup();
+  });
+  grid.appendChild(allChip);
+
+  for (let g = 1; g <= 12; g++) {
+    const n = byGrade.get(g).length;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "grade-chip" + (selected.has(g) ? " selected" : "");
+    chip.disabled = n === 0;
+    chip.innerHTML = `Grade ${g}<span class="cnt">${n} word${n === 1 ? "" : "s"}</span>`;
+    chip.addEventListener("click", () => {
+      if (selected.has(g)) selected.delete(g);
+      else selected.add(g);
+      renderPracticeSetup();
+    });
+    grid.appendChild(chip);
+  }
+
+  const total = [...selected].reduce((s, g) => s + byGrade.get(g).length, 0);
+  $("practice-summary").textContent =
+    all.length === 0
+      ? "No tricky words yet — play a game first! 🎉"
+      : total === 0
+        ? "Pick at least one level to practice."
+        : `${total} tricky word${total === 1 ? "" : "s"} selected — a session drills up to 10, most-missed first.`;
+  $("btn-start-practice").disabled = total === 0;
+}
+
+function startPracticeSession() {
+  const { all, byGrade, selected } = practiceData;
+  const entries = all.filter((e) => selected.has(e.grade)).slice(0, 10);
+  if (!entries.length) return;
+  const sel = [...selected].sort((a, b) => a - b);
+  const withWords = [...byGrade.entries()].filter(([, e]) => e.length).map(([g]) => g);
+  const label = sel.length === 1
+    ? `Grade ${sel[0]}`
+    : sel.length === withWords.length
+      ? "all levels"
+      : `Grades ${sel.join(", ")}`;
+  game = {
+    mode: "practice",
+    round: "main",
+    queue: entries,
+    index: 0,
+    results: [],      // { w, s, p, first_try_correct }
+    requeued: new Set(),
+  };
+  $("game-round").textContent = `🎯 Practicing ${label}`;
+  $("game-round").hidden = false;
+  $("game-points").hidden = true;
+  $("score-line").hidden = true;
+  show("screen-game");
+  nextWordUI();
+}
+
+$("btn-start-practice").addEventListener("click", startPracticeSession);
+$("btn-practice-home").addEventListener("click", () => enterHome());
 
 function nextWordUI() {
   const item = game.queue[game.index];
@@ -510,8 +566,8 @@ function escapeHtml(s) {
 let lastMode = "scored";
 
 $("btn-start").addEventListener("click", startGame);
-$("btn-practice").addEventListener("click", startPractice);
-$("btn-play-again").addEventListener("click", () => (lastMode === "practice" ? startPractice() : startGame()));
+$("btn-practice").addEventListener("click", openPracticeSetup);
+$("btn-play-again").addEventListener("click", () => (lastMode === "practice" ? openPracticeSetup() : startGame()));
 $("btn-results-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------

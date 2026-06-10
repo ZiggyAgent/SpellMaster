@@ -154,6 +154,30 @@ textarea { resize: vertical; font-size: 1rem; font-family: inherit; }
 .table td { padding: 9px 6px; border-bottom: 1px solid var(--line); }
 .table tr.me td { background: var(--accent-soft); font-weight: 700; }
 
+/* Practice level picker */
+.grade-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+.grade-chip {
+  padding: 9px 4px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: .9rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
+}
+.grade-chip .cnt { display: block; font-size: .78rem; font-weight: 500; color: var(--ink-soft); }
+.grade-chip.selected { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dark); }
+.grade-chip.selected .cnt { color: var(--primary-dark); }
+.grade-chip:disabled { opacity: .45; cursor: default; }
+
 /* Tabs */
 .tabs { display: flex; gap: 0; margin-bottom: 14px; background: #e2e8f0; border-radius: 12px; padding: 4px; }
 .tab {
