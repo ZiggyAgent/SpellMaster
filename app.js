@@ -80,13 +80,21 @@ function utter(text, rate) {
   speechSynthesis.speak(u);
 }
 
-function sayCurrentWord() {
+function sayCurrentWord(slow = false) {
   if (!canSpeak || !game) return;
   const item = game.queue[game.index];
+  const wordRate = slow ? 0.45 : 0.65;
+  const sentenceRate = slow ? 0.7 : 0.85;
   speechSynthesis.cancel();
-  utter(item.w + ".", 0.65);   // the word: slow and clear
-  utter(item.s, 0.85);         // the sentence: a bit slower than normal speech
-  utter(item.w + ".", 0.65);
+  utter(item.w + ".", wordRate);   // the word: slow and clear
+  utter(item.s, sentenceRate);     // the sentence: a bit slower than normal speech
+  utter(item.w + ".", wordRate);
+}
+
+// Lookup for practice mode: any word ever missed can be found in the bank
+const WORD_INDEX = new Map();
+for (const words of Object.values(WORD_BANK)) {
+  for (const item of words) WORD_INDEX.set(item.w.toLowerCase(), item);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +189,7 @@ fillGradeSelect($("lb-grade-select"));
 function enterHome(isNew = false) {
   $("home-name").textContent = player.name;
   $("home-new").hidden = !isNew;
+  $("home-msg").hidden = true;
   $("grade-select").value = localStorage.getItem(GRADE_KEY) || "1";
   $("tts-note").hidden = canSpeak;
   show("screen-home");
@@ -203,6 +212,7 @@ function pickWords(grade, count) {
 function startGame() {
   const grade = Number($("grade-select").value);
   game = {
+    mode: "scored",
     grade,
     round: "main", // "main" | "retry"
     queue: pickWords(grade, 10),
@@ -211,15 +221,53 @@ function startGame() {
     results: [], // { w, s, p, first_try_correct, retry_correct, earned }
   };
   $("game-round").hidden = true;
+  $("game-points").hidden = false;
+  $("score-line").hidden = false;
   $("game-score").textContent = "0";
   show("screen-game");
   nextWordUI();
 }
 
+// Practice mode: drill this player's own tricky words. Unscored, never saved,
+// and a word missed during practice comes back once more at the end.
+async function startPractice() {
+  $("home-msg").hidden = true;
+  try {
+    const r = await rpc("spelling", "get_missed_words", { p_player_id: player.id, p_pin: player.pin });
+    if (!r.ok) {
+      $("home-msg").textContent = "Couldn't load your tricky words — try signing out and back in.";
+      $("home-msg").hidden = false;
+      return;
+    }
+    const entries = r.words.map((x) => WORD_INDEX.get(x.word.toLowerCase())).filter(Boolean);
+    if (!entries.length) {
+      $("home-msg").textContent = "No tricky words yet — play a game first! 🎉";
+      $("home-msg").hidden = false;
+      return;
+    }
+    game = {
+      mode: "practice",
+      round: "main",
+      queue: entries.slice(0, 10), // most-missed first (server sorts by miss count)
+      index: 0,
+      results: [],      // { w, s, p, first_try_correct }
+      requeued: new Set(),
+    };
+    $("game-round").hidden = true;
+    $("game-points").hidden = true;
+    $("score-line").hidden = true;
+    show("screen-game");
+    nextWordUI();
+  } catch {
+    $("home-msg").textContent = "Could not reach the game server. Check your internet and try again.";
+    $("home-msg").hidden = false;
+  }
+}
+
 function nextWordUI() {
   const item = game.queue[game.index];
   const total = game.queue.length;
-  const label = game.round === "main" ? "Word" : "Retry";
+  const label = game.mode === "practice" ? "Practice" : game.round === "main" ? "Word" : "Retry";
   $("game-progress").textContent = `${label} ${game.index + 1} of ${total}`;
   const pts = game.round === "main" ? item.p : item.p / 2;
   $("game-points").textContent = `Worth ${fmt(pts)} points`;
@@ -235,7 +283,7 @@ function showFeedback(correct, earned, word) {
   const el = $("game-feedback");
   el.className = "feedback " + (correct ? "good" : "bad");
   if (correct) {
-    el.innerHTML = `✅ Correct! +${fmt(earned)} points`;
+    el.innerHTML = earned === null ? "✅ Correct!" : `✅ Correct! +${fmt(earned)} points`;
   } else {
     el.innerHTML = `❌ Not quite! It's spelled:<span class="spelled">${word.toUpperCase()}</span>`;
   }
@@ -251,6 +299,26 @@ $("game-form").addEventListener("submit", (e) => {
   if (!guess) return;
   const item = game.queue[game.index];
   const correct = guess === item.w.toLowerCase();
+
+  if (game.mode === "practice") {
+    if (!game.results.some((r) => r.w === item.w)) {
+      game.results.push({ ...item, first_try_correct: correct });
+    }
+    showFeedback(correct, null, item.w);
+    advancing = true;
+    if (correct) {
+      setTimeout(advanceWord, 1100);
+    } else {
+      if (!game.requeued.has(item.w)) {
+        game.requeued.add(item.w);
+        game.queue.push(item); // one more try at the end of the session
+      }
+      $("game-input").disabled = true;
+      $("btn-continue").hidden = false;
+      $("btn-continue").focus();
+    }
+    return;
+  }
 
   let earned = 0;
   if (game.round === "main") {
@@ -286,6 +354,10 @@ function advanceWord() {
     nextWordUI();
     return;
   }
+  if (game.mode === "practice") {
+    finishPractice();
+    return;
+  }
   if (game.round === "main") {
     const missed = game.results.filter((r) => !r.first_try_correct);
     if (missed.length > 0) {
@@ -301,7 +373,28 @@ function advanceWord() {
 }
 
 $("btn-continue").addEventListener("click", advanceWord);
-$("btn-hear").addEventListener("click", sayCurrentWord);
+$("btn-hear").addEventListener("click", () => sayCurrentWord(false));
+$("btn-hear-slow").addEventListener("click", () => sayCurrentWord(true));
+
+function finishPractice() {
+  if (canSpeak) speechSynthesis.cancel();
+  const total = game.results.length;
+  const good = game.results.filter((r) => r.first_try_correct).length;
+  $("result-title").textContent = "🎯 Practice Complete!";
+  $("result-summary").innerHTML =
+    `You spelled <strong>${good}</strong> of <strong>${total}</strong> tricky words right on the first try`;
+  const list = $("result-words");
+  list.innerHTML = "";
+  for (const r of game.results) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${r.first_try_correct ? "✅" : "❌"} ${r.w}</span>`;
+    list.appendChild(li);
+  }
+  $("result-lb-card").hidden = true;
+  $("btn-play-again").textContent = "🎯 Practice Again";
+  lastMode = "practice";
+  show("screen-results");
+}
 
 async function finishGame() {
   if (canSpeak) speechSynthesis.cancel();
@@ -313,8 +406,12 @@ async function finishGame() {
   }));
   const maxScore = game.results.reduce((s, r) => s + r.p, 0);
 
-  $("result-score").textContent = fmt(game.score);
-  $("result-max").textContent = fmt(maxScore);
+  $("result-title").textContent = "🎉 Round Complete!";
+  $("result-summary").innerHTML =
+    `You scored <strong>${fmt(game.score)}</strong> out of ${fmt(maxScore)} points`;
+  $("result-lb-card").hidden = false;
+  $("btn-play-again").textContent = "▶️ Play Again";
+  lastMode = "scored";
   const list = $("result-words");
   list.innerHTML = "";
   for (const r of game.results) {
@@ -368,8 +465,11 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+let lastMode = "scored";
+
 $("btn-start").addEventListener("click", startGame);
-$("btn-play-again").addEventListener("click", startGame);
+$("btn-practice").addEventListener("click", startPractice);
+$("btn-play-again").addEventListener("click", () => (lastMode === "practice" ? startPractice() : startGame()));
 $("btn-results-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------

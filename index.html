@@ -43,6 +43,8 @@
           <select id="grade-select"></select>
         </label>
         <button class="btn btn-primary btn-big" id="btn-start">▶️ Start Game</button>
+        <button class="btn btn-secondary" id="btn-practice">🎯 Practice My Tricky Words</button>
+        <p id="home-msg" class="muted" hidden></p>
         <div class="home-row">
           <button class="btn btn-secondary" id="btn-leaderboard">🏆 Top 10</button>
           <button class="btn btn-secondary" id="btn-history">📖 My History</button>
@@ -61,7 +63,10 @@
       </div>
       <div class="card game-card">
         <p class="listen-hint">Listen carefully, then spell the word:</p>
-        <button class="btn btn-hear" id="btn-hear">🔊 Hear it again</button>
+        <div class="home-row">
+          <button class="btn btn-hear" id="btn-hear">🔊 Hear it again</button>
+          <button class="btn btn-hear" id="btn-hear-slow">🐢 Slowly</button>
+        </div>
         <form id="game-form">
           <input id="game-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the word here…">
           <button type="submit" class="btn btn-primary btn-big">Check ✔</button>
@@ -69,17 +74,17 @@
         <div id="game-feedback" class="feedback" hidden></div>
         <button type="button" class="btn btn-primary" id="btn-continue" hidden>Continue ➜</button>
       </div>
-      <p class="score-line">Score so far: <strong id="game-score">0</strong></p>
+      <p class="score-line" id="score-line">Score so far: <strong id="game-score">0</strong></p>
     </section>
 
     <!-- Results screen -->
     <section id="screen-results" class="screen" hidden>
-      <h1 class="logo small">🎉 Round Complete!</h1>
+      <h1 class="logo small" id="result-title">🎉 Round Complete!</h1>
       <div class="card">
-        <p class="final-score">You scored <strong id="result-score"></strong> out of <span id="result-max"></span> points</p>
+        <p class="final-score" id="result-summary"></p>
         <ul id="result-words" class="word-results"></ul>
       </div>
-      <div class="card">
+      <div class="card" id="result-lb-card">
         <h2 id="result-lb-title">🏆 Top 10</h2>
         <p id="result-lb-congrats" class="congrats" hidden>🌟 You made the Top 10! 🌟</p>
         <table class="table" id="result-lb-table">
