@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpellMaster 🐝</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐝</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Auth screen -->
+    <section id="screen-auth" class="screen">
+      <h1 class="logo">🐝 SpellMaster</h1>
+      <p class="tagline">Listen. Spell. Win!</p>
+      <div class="card">
+        <h2 id="auth-title">Sign In</h2>
+        <form id="auth-form">
+          <label>Your name
+            <input id="auth-name" type="text" maxlength="20" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+          </label>
+          <label>4-digit PIN
+            <input id="auth-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required>
+          </label>
+          <p id="auth-error" class="error" hidden></p>
+          <button type="submit" class="btn btn-primary" id="auth-submit">Sign In</button>
+        </form>
+        <p class="switch-auth">
+          <span id="auth-switch-text">New player?</span>
+          <a href="#" id="auth-switch-link">Create an account</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- Home screen -->
+    <section id="screen-home" class="screen" hidden>
+      <h1 class="logo">🐝 SpellMaster</h1>
+      <p class="welcome">Hi, <span id="home-name"></span>! 👋</p>
+      <div class="card">
+        <label class="grade-label">Pick your grade level
+          <select id="grade-select"></select>
+        </label>
+        <button class="btn btn-primary btn-big" id="btn-start">▶️ Start Game</button>
+        <div class="home-row">
+          <button class="btn btn-secondary" id="btn-leaderboard">🏆 Top 10</button>
+          <button class="btn btn-secondary" id="btn-history">📖 My History</button>
+        </div>
+        <button class="btn btn-ghost" id="btn-signout">Sign out</button>
+      </div>
+      <p class="tts-note" id="tts-note" hidden>⚠️ Your browser can't speak words aloud. Try Chrome, Edge, or Safari.</p>
+    </section>
+
+    <!-- Game screen -->
+    <section id="screen-game" class="screen" hidden>
+      <div class="game-top">
+        <span id="game-progress" class="pill"></span>
+        <span id="game-round" class="pill pill-round" hidden>🔁 Retry Round — half points!</span>
+        <span id="game-points" class="pill pill-points"></span>
+      </div>
+      <div class="card game-card">
+        <p class="listen-hint">Listen carefully, then spell the word:</p>
+        <button class="btn btn-hear" id="btn-hear">🔊 Hear it again</button>
+        <form id="game-form">
+          <input id="game-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the word here…">
+          <button type="submit" class="btn btn-primary btn-big">Check ✔</button>
+        </form>
+        <div id="game-feedback" class="feedback" hidden></div>
+      </div>
+      <p class="score-line">Score so far: <strong id="game-score">0</strong></p>
+    </section>
+
+    <!-- Results screen -->
+    <section id="screen-results" class="screen" hidden>
+      <h1 class="logo small">🎉 Round Complete!</h1>
+      <div class="card">
+        <p class="final-score">You scored <strong id="result-score"></strong> out of <span id="result-max"></span> points</p>
+        <ul id="result-words" class="word-results"></ul>
+      </div>
+      <div class="card">
+        <h2 id="result-lb-title">🏆 Top 10</h2>
+        <p id="result-lb-congrats" class="congrats" hidden>🌟 You made the Top 10! 🌟</p>
+        <table class="table" id="result-lb-table">
+          <thead><tr><th>#</th><th>Name</th><th>Score</th><th>Date</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="home-row">
+        <button class="btn btn-primary" id="btn-play-again">▶️ Play Again</button>
+        <button class="btn btn-secondary" id="btn-results-home">🏠 Home</button>
+      </div>
+    </section>
+
+    <!-- Leaderboard screen -->
+    <section id="screen-leaderboard" class="screen" hidden>
+      <h1 class="logo small">🏆 Top 10</h1>
+      <div class="card">
+        <label class="grade-label">Grade level
+          <select id="lb-grade-select"></select>
+        </label>
+        <table class="table" id="lb-table">
+          <thead><tr><th>#</th><th>Name</th><th>Score</th><th>Date</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p id="lb-empty" class="muted" hidden>No games played at this level yet. Be the first!</p>
+      </div>
+      <button class="btn btn-secondary" id="btn-lb-home">🏠 Home</button>
+    </section>
+
+    <!-- History screen -->
+    <section id="screen-history" class="screen" hidden>
+      <h1 class="logo small">📖 My History</h1>
+      <div class="tabs">
+        <button class="tab active" data-tab="games">My Games</button>
+        <button class="tab" data-tab="words">Tricky Words</button>
+        <button class="tab" data-tab="bests">Best Scores</button>
+      </div>
+      <div class="card" id="tab-games">
+        <table class="table">
+          <thead><tr><th>Date</th><th>Grade</th><th>Score</th><th>Missed Words</th></tr></thead>
+          <tbody id="history-games"></tbody>
+        </table>
+        <p id="history-games-empty" class="muted" hidden>No games yet — go play one!</p>
+      </div>
+      <div class="card" id="tab-words" hidden>
+        <table class="table">
+          <thead><tr><th>Word</th><th>Times Missed</th><th>Last Missed</th></tr></thead>
+          <tbody id="history-words"></tbody>
+        </table>
+        <p id="history-words-empty" class="muted" hidden>No misspelled words. Amazing! 🌟</p>
+      </div>
+      <div class="card" id="tab-bests" hidden>
+        <table class="table">
+          <thead><tr><th>Grade</th><th>Best Score</th><th>Games Played</th></tr></thead>
+          <tbody id="history-bests"></tbody>
+        </table>
+        <p id="history-bests-empty" class="muted" hidden>No games yet — go play one!</p>
+      </div>
+      <button class="btn btn-secondary" id="btn-history-home">🏠 Home</button>
+    </section>
+
+  </div>
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
