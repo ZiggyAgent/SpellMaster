@@ -46,23 +46,37 @@ function fmt(n) {
 // Speech
 // ---------------------------------------------------------------------------
 const canSpeak = "speechSynthesis" in window;
+let cachedVoice = null;
+
+// Prefer the highest-quality English voice the device offers. On macOS,
+// downloadable "Premium"/"Enhanced" voices (System Settings -> Accessibility
+// -> Spoken Content) are picked up automatically once installed.
+function voiceRank(v) {
+  const n = v.name.toLowerCase();
+  if (/natural|neural/.test(n)) return 0;          // Edge online natural voices
+  if (/premium|enhanced/.test(n)) return 1;        // macOS/iOS downloaded voices
+  if (/\b(ava|zoe|allison|samantha|nicky|joelle)\b/.test(n)) return 2; // better Apple voices
+  if (/google us english/.test(n)) return 3;       // Chrome
+  if (v.lang === "en-US") return 4;
+  return 5;
+}
 
 function pickVoice() {
-  const voices = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.startsWith("en"));
-  return (
-    voices.find((v) => /samantha|google us english|aria|zira/i.test(v.name)) ||
-    voices.find((v) => v.lang === "en-US") ||
-    voices[0] ||
-    null
-  );
+  const en = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
+  en.sort((a, b) => voiceRank(a) - voiceRank(b));
+  return en[0] || null;
+}
+
+if (canSpeak) {
+  cachedVoice = pickVoice();
+  speechSynthesis.onvoiceschanged = () => { cachedVoice = pickVoice(); };
 }
 
 function utter(text, rate) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
   u.rate = rate;
-  const v = pickVoice();
-  if (v) u.voice = v;
+  if (cachedVoice) u.voice = cachedVoice;
   speechSynthesis.speak(u);
 }
 
@@ -70,31 +84,28 @@ function sayCurrentWord() {
   if (!canSpeak || !game) return;
   const item = game.queue[game.index];
   speechSynthesis.cancel();
-  utter(item.w + ".", 0.75);
-  utter(item.s, 0.95);
-  utter(item.w + ".", 0.75);
+  utter(item.w + ".", 0.65);   // the word: slow and clear
+  utter(item.s, 0.85);         // the sentence: a bit slower than normal speech
+  utter(item.w + ".", 0.65);
 }
 
-if (canSpeak) speechSynthesis.getVoices(); // warm up async voice list
-
 // ---------------------------------------------------------------------------
-// Auth
+// Auth — one form for everyone; the server tells us if the name is new.
+// An unknown name needs an explicit second click ("Create my account") so a
+// typo never silently creates an account.
 // ---------------------------------------------------------------------------
-let authMode = "signin";
+let pendingCreate = false;
 
-function setAuthMode(mode) {
-  authMode = mode;
-  $("auth-title").textContent = mode === "signin" ? "Sign In" : "Create Account";
-  $("auth-submit").textContent = mode === "signin" ? "Sign In" : "Create Account";
-  $("auth-switch-text").textContent = mode === "signin" ? "New player?" : "Already have an account?";
-  $("auth-switch-link").textContent = mode === "signin" ? "Create an account" : "Sign in";
+function resetAuthMode() {
+  pendingCreate = false;
+  $("auth-submit").textContent = "Let's Go";
+  $("auth-notice").hidden = true;
   $("auth-error").hidden = true;
 }
 
-$("auth-switch-link").addEventListener("click", (e) => {
-  e.preventDefault();
-  setAuthMode(authMode === "signin" ? "signup" : "signin");
-});
+["auth-name", "auth-pin"].forEach((id) =>
+  $(id).addEventListener("input", resetAuthMode)
+);
 
 $("auth-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -104,16 +115,23 @@ $("auth-form").addEventListener("submit", async (e) => {
   errEl.hidden = true;
   $("auth-submit").disabled = true;
   try {
-    const fn = authMode === "signin" ? "login" : "signup";
-    const r = await rpc("arcade", fn, { p_name: name, p_pin: pin });
-    if (!r.ok) {
-      errEl.textContent = r.error;
-      errEl.hidden = false;
+    const r = await rpc("arcade", "enter", { p_name: name, p_pin: pin, p_create: pendingCreate });
+    if (r.ok) {
+      player = { id: r.player_id, name: r.name, pin };
+      localStorage.setItem(PLAYER_KEY, JSON.stringify(player));
+      enterHome(r.status === "created");
+      resetAuthMode();
       return;
     }
-    player = { id: r.player_id, name: r.name, pin };
-    localStorage.setItem(PLAYER_KEY, JSON.stringify(player));
-    enterHome();
+    if (r.status === "not_found") {
+      pendingCreate = true;
+      $("auth-notice").textContent = `We haven't met "${name}" yet! Press "Create my account" to join — or fix the spelling if that's not quite your name.`;
+      $("auth-notice").hidden = false;
+      $("auth-submit").textContent = "Create my account";
+      return;
+    }
+    errEl.textContent = r.error;
+    errEl.hidden = false;
   } catch (err) {
     errEl.textContent = "Could not reach the game server. Check your internet and try again.";
     errEl.hidden = false;
@@ -127,7 +145,7 @@ $("btn-signout").addEventListener("click", () => {
   player = null;
   $("auth-name").value = "";
   $("auth-pin").value = "";
-  setAuthMode("signin");
+  resetAuthMode();
   show("screen-auth");
 });
 
@@ -146,8 +164,9 @@ function fillGradeSelect(sel) {
 fillGradeSelect($("grade-select"));
 fillGradeSelect($("lb-grade-select"));
 
-function enterHome() {
+function enterHome(isNew = false) {
   $("home-name").textContent = player.name;
+  $("home-new").hidden = !isNew;
   $("grade-select").value = localStorage.getItem(GRADE_KEY) || "1";
   $("tts-note").hidden = canSpeak;
   show("screen-home");
@@ -190,8 +209,10 @@ function nextWordUI() {
   $("game-progress").textContent = `${label} ${game.index + 1} of ${total}`;
   const pts = game.round === "main" ? item.p : item.p / 2;
   $("game-points").textContent = `Worth ${fmt(pts)} points`;
+  $("game-input").disabled = false;
   $("game-input").value = "";
   $("game-feedback").hidden = true;
+  $("btn-continue").hidden = true;
   $("game-input").focus();
   sayCurrentWord();
 }
@@ -230,30 +251,42 @@ $("game-form").addEventListener("submit", (e) => {
   game.score += earned;
   $("game-score").textContent = fmt(game.score);
   showFeedback(correct, earned, item.w);
-
   advancing = true;
-  setTimeout(() => {
-    advancing = false;
-    game.index++;
-    if (game.index < game.queue.length) {
+
+  if (correct) {
+    // Correct answers move on by themselves; misses wait for "Continue" so
+    // there's time to study the right spelling.
+    setTimeout(advanceWord, 1100);
+  } else {
+    $("game-input").disabled = true;
+    $("btn-continue").hidden = false;
+    $("btn-continue").focus();
+  }
+});
+
+function advanceWord() {
+  if (!game) return;
+  advancing = false;
+  game.index++;
+  if (game.index < game.queue.length) {
+    nextWordUI();
+    return;
+  }
+  if (game.round === "main") {
+    const missed = game.results.filter((r) => !r.first_try_correct);
+    if (missed.length > 0) {
+      game.round = "retry";
+      game.queue = missed.map((r) => ({ w: r.w, s: r.s, p: r.p }));
+      game.index = 0;
+      $("game-round").hidden = false;
       nextWordUI();
       return;
     }
-    if (game.round === "main") {
-      const missed = game.results.filter((r) => !r.first_try_correct);
-      if (missed.length > 0) {
-        game.round = "retry";
-        game.queue = missed.map((r) => ({ w: r.w, s: r.s, p: r.p }));
-        game.index = 0;
-        $("game-round").hidden = false;
-        nextWordUI();
-        return;
-      }
-    }
-    finishGame();
-  }, correct ? 1100 : 2400);
-});
+  }
+  finishGame();
+}
 
+$("btn-continue").addEventListener("click", advanceWord);
 $("btn-hear").addEventListener("click", sayCurrentWord);
 
 async function finishGame() {
@@ -315,7 +348,7 @@ function escapeHtml(s) {
 
 $("btn-start").addEventListener("click", startGame);
 $("btn-play-again").addEventListener("click", startGame);
-$("btn-results-home").addEventListener("click", enterHome);
+$("btn-results-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------
 // Leaderboard screen
@@ -339,7 +372,7 @@ $("btn-leaderboard").addEventListener("click", () => {
   loadLeaderboard();
 });
 $("lb-grade-select").addEventListener("change", loadLeaderboard);
-$("btn-lb-home").addEventListener("click", enterHome);
+$("btn-lb-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------
 // History screen
@@ -398,7 +431,7 @@ $("btn-history").addEventListener("click", () => {
   show("screen-history");
   loadHistory();
 });
-$("btn-history-home").addEventListener("click", enterHome);
+$("btn-history-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------
 // Boot
@@ -412,6 +445,5 @@ $("btn-history-home").addEventListener("click", enterHome);
       return;
     } catch { /* fall through to auth */ }
   }
-  setAuthMode("signin");
   show("screen-auth");
 })();

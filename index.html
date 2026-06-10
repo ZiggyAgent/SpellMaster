@@ -6,7 +6,7 @@
   <title>SpellMaster 🐝</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐝</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
       <h1 class="logo">🐝 SpellMaster</h1>
       <p class="tagline">Listen. Spell. Win!</p>
       <div class="card">
-        <h2 id="auth-title">Sign In</h2>
+        <h2>Who's playing?</h2>
         <form id="auth-form">
           <label>Your name
             <input id="auth-name" type="text" maxlength="20" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
@@ -25,13 +25,11 @@
           <label>4-digit PIN
             <input id="auth-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required>
           </label>
+          <p id="auth-notice" class="notice" hidden></p>
           <p id="auth-error" class="error" hidden></p>
-          <button type="submit" class="btn btn-primary" id="auth-submit">Sign In</button>
+          <button type="submit" class="btn btn-primary" id="auth-submit">Let's Go</button>
         </form>
-        <p class="switch-auth">
-          <span id="auth-switch-text">New player?</span>
-          <a href="#" id="auth-switch-link">Create an account</a>
-        </p>
+        <p class="hint">First time? Just pick a name and a PIN — we'll set you up.</p>
       </div>
     </section>
 
@@ -39,6 +37,7 @@
     <section id="screen-home" class="screen" hidden>
       <h1 class="logo">🐝 SpellMaster</h1>
       <p class="welcome">Hi, <span id="home-name"></span>! 👋</p>
+      <p class="congrats" id="home-new" hidden>🎉 Your account was created — welcome to SpellMaster!</p>
       <div class="card">
         <label class="grade-label">Pick your grade level
           <select id="grade-select"></select>
@@ -68,6 +67,7 @@
           <button type="submit" class="btn btn-primary btn-big">Check ✔</button>
         </form>
         <div id="game-feedback" class="feedback" hidden></div>
+        <button type="button" class="btn btn-primary" id="btn-continue" hidden>Continue ➜</button>
       </div>
       <p class="score-line">Score so far: <strong id="game-score">0</strong></p>
     </section>
