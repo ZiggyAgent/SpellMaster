@@ -91,10 +91,11 @@ function sayCurrentWord(slow = false) {
   utter(item.w + ".", wordRate);
 }
 
-// Lookup for practice mode: any word ever missed can be found in the bank
+// Lookup for practice mode: any word ever missed can be found in the bank,
+// along with the grade it belongs to (words are unique across grades).
 const WORD_INDEX = new Map();
-for (const words of Object.values(WORD_BANK)) {
-  for (const item of words) WORD_INDEX.set(item.w.toLowerCase(), item);
+for (const [grade, words] of Object.entries(WORD_BANK)) {
+  for (const item of words) WORD_INDEX.set(item.w.toLowerCase(), { ...item, grade: Number(grade) });
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +187,10 @@ function fillGradeSelect(sel) {
 fillGradeSelect($("grade-select"));
 fillGradeSelect($("lb-grade-select"));
 
+function updatePracticeLabel() {
+  $("btn-practice").textContent = `🎯 Practice Tricky Words (Grade ${$("grade-select").value})`;
+}
+
 function enterHome(isNew = false) {
   $("home-name").textContent = player.name;
   $("home-new").hidden = !isNew;
@@ -193,10 +198,14 @@ function enterHome(isNew = false) {
   $("btn-admin-feedback").hidden = !player.admin;
   $("grade-select").value = localStorage.getItem(GRADE_KEY) || "1";
   $("tts-note").hidden = canSpeak;
+  updatePracticeLabel();
   show("screen-home");
 }
 
-$("grade-select").addEventListener("change", (e) => localStorage.setItem(GRADE_KEY, e.target.value));
+$("grade-select").addEventListener("change", (e) => {
+  localStorage.setItem(GRADE_KEY, e.target.value);
+  updatePracticeLabel();
+});
 
 // ---------------------------------------------------------------------------
 // Game
@@ -229,10 +238,12 @@ function startGame() {
   nextWordUI();
 }
 
-// Practice mode: drill this player's own tricky words. Unscored, never saved,
-// and a word missed during practice comes back once more at the end.
+// Practice mode: drill this player's own tricky words at the selected grade.
+// Unscored, never saved, and a word missed during practice comes back once
+// more at the end.
 async function startPractice() {
   $("home-msg").hidden = true;
+  const grade = Number($("grade-select").value);
   try {
     const r = await rpc("spelling", "get_missed_words", { p_player_id: player.id, p_pin: player.pin });
     if (!r.ok) {
@@ -240,9 +251,13 @@ async function startPractice() {
       $("home-msg").hidden = false;
       return;
     }
-    const entries = r.words.map((x) => WORD_INDEX.get(x.word.toLowerCase())).filter(Boolean);
+    const all = r.words.map((x) => WORD_INDEX.get(x.word.toLowerCase())).filter(Boolean);
+    const entries = all.filter((e) => e.grade === grade);
     if (!entries.length) {
-      $("home-msg").textContent = "No tricky words yet — play a game first! 🎉";
+      const others = [...new Set(all.map((e) => e.grade))].sort((a, b) => a - b);
+      $("home-msg").textContent = others.length
+        ? `No tricky words at Grade ${grade}. You have some at Grade ${others.join(", ")} — switch the level above to practice those.`
+        : "No tricky words yet — play a game first! 🎉";
       $("home-msg").hidden = false;
       return;
     }
@@ -254,7 +269,8 @@ async function startPractice() {
       results: [],      // { w, s, p, first_try_correct }
       requeued: new Set(),
     };
-    $("game-round").hidden = true;
+    $("game-round").textContent = `🎯 Practicing Grade ${grade} words`;
+    $("game-round").hidden = false;
     $("game-points").hidden = true;
     $("score-line").hidden = true;
     show("screen-game");
@@ -365,6 +381,7 @@ function advanceWord() {
       game.round = "retry";
       game.queue = missed.map((r) => ({ w: r.w, s: r.s, p: r.p }));
       game.index = 0;
+      $("game-round").textContent = "🔁 Retry Round — half points!";
       $("game-round").hidden = false;
       nextWordUI();
       return;
