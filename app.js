@@ -149,6 +149,20 @@ $("btn-signout").addEventListener("click", () => {
   show("screen-auth");
 });
 
+// Sign out a session that's no longer valid on the server, and say why —
+// players should never be silently stranded or silently logged out.
+function forceSignOut(message) {
+  localStorage.removeItem(PLAYER_KEY);
+  player = null;
+  game = null;
+  $("auth-name").value = "";
+  $("auth-pin").value = "";
+  resetAuthMode();
+  $("auth-notice").textContent = message;
+  $("auth-notice").hidden = false;
+  show("screen-auth");
+}
+
 // ---------------------------------------------------------------------------
 // Home
 // ---------------------------------------------------------------------------
@@ -320,6 +334,14 @@ async function finishGame() {
       p_grade: game.grade,
       p_words: words,
     });
+    if (!saved.ok) {
+      $("result-lb-congrats").textContent =
+        "⚠️ Your score could NOT be saved — your sign-in is out of date. Sign out, sign back in, and play again.";
+      $("result-lb-congrats").hidden = false;
+      const lb = await rpc("spelling", "get_leaderboard", { p_grade: game.grade });
+      renderLeaderboard($("result-lb-table").querySelector("tbody"), lb, null);
+      return;
+    }
     const lb = await rpc("spelling", "get_leaderboard", { p_grade: game.grade });
     const madeIt = saved.ok && lb.some((row) => row.name === player.name && Number(row.score) === Number(saved.score));
     $("result-lb-congrats").hidden = !madeIt;
@@ -436,14 +458,32 @@ $("btn-history-home").addEventListener("click", () => enterHome());
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
-(function boot() {
+(async function boot() {
   const saved = localStorage.getItem(PLAYER_KEY);
   if (saved) {
     try {
       player = JSON.parse(saved);
-      enterHome();
-      return;
-    } catch { /* fall through to auth */ }
+    } catch {
+      player = null;
+    }
   }
-  show("screen-auth");
+  if (!player) {
+    show("screen-auth");
+    return;
+  }
+  enterHome();
+  // Re-validate the saved session in the background so an account change on
+  // the server (or an app update) never leaves a stale session failing
+  // silently. Offline? Keep the cached session and let them play.
+  try {
+    const r = await rpc("arcade", "enter", { p_name: player.name, p_pin: player.pin, p_create: false });
+    if (r.ok) {
+      if (r.player_id !== player.id) {
+        player.id = r.player_id;
+        localStorage.setItem(PLAYER_KEY, JSON.stringify(player));
+      }
+    } else {
+      forceSignOut("You were signed out because your account changed on the server. Please sign in again — sorry about that!");
+    }
+  } catch { /* network hiccup — keep the cached session */ }
 })();
