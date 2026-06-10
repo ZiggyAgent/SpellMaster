@@ -125,7 +125,7 @@ $("auth-form").addEventListener("submit", async (e) => {
   try {
     const r = await rpc("arcade", "enter", { p_name: name, p_pin: pin, p_create: pendingCreate });
     if (r.ok) {
-      player = { id: r.player_id, name: r.name, pin };
+      player = { id: r.player_id, name: r.name, pin, admin: !!r.is_admin };
       localStorage.setItem(PLAYER_KEY, JSON.stringify(player));
       enterHome(r.status === "created");
       resetAuthMode();
@@ -190,6 +190,7 @@ function enterHome(isNew = false) {
   $("home-name").textContent = player.name;
   $("home-new").hidden = !isNew;
   $("home-msg").hidden = true;
+  $("btn-admin-feedback").hidden = !player.admin;
   $("grade-select").value = localStorage.getItem(GRADE_KEY) || "1";
   $("tts-note").hidden = canSpeak;
   show("screen-home");
@@ -556,6 +557,66 @@ $("btn-history").addEventListener("click", () => {
 $("btn-history-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------
+// Feedback (players) + admin inbox (parent account flagged is_admin in DB)
+// ---------------------------------------------------------------------------
+$("btn-feedback").addEventListener("click", () => {
+  $("feedback-text").value = "";
+  $("feedback-msg").hidden = true;
+  show("screen-feedback");
+  $("feedback-text").focus();
+});
+$("btn-feedback-home").addEventListener("click", () => enterHome());
+
+$("btn-send-feedback").addEventListener("click", async () => {
+  const msg = $("feedback-text").value.trim();
+  if (!msg) return;
+  $("btn-send-feedback").disabled = true;
+  try {
+    const r = await rpc("arcade", "submit_feedback", {
+      p_player_id: player.id, p_pin: player.pin, p_game: "spelling", p_message: msg,
+    });
+    if (r.ok) {
+      enterHome();
+      $("home-msg").textContent = "Thanks! Your feedback was sent. 💛";
+      $("home-msg").hidden = false;
+    } else {
+      $("feedback-msg").textContent = r.error;
+      $("feedback-msg").hidden = false;
+    }
+  } catch {
+    $("feedback-msg").textContent = "Could not reach the game server — try again.";
+    $("feedback-msg").hidden = false;
+  } finally {
+    $("btn-send-feedback").disabled = false;
+  }
+});
+
+$("btn-admin-feedback").addEventListener("click", async () => {
+  show("screen-admin");
+  const tbody = $("admin-feedback-rows");
+  tbody.innerHTML = `<tr><td colspan="3">Loading…</td></tr>`;
+  $("admin-empty").hidden = true;
+  try {
+    const r = await rpc("arcade", "get_feedback", { p_player_id: player.id, p_pin: player.pin });
+    tbody.innerHTML = "";
+    if (!r.ok) {
+      tbody.innerHTML = `<tr><td colspan="3">${escapeHtml(r.error)}</td></tr>`;
+      return;
+    }
+    $("admin-empty").hidden = r.feedback.length > 0;
+    for (const f of r.feedback) {
+      const tr = document.createElement("tr");
+      const date = new Date(f.created_at).toLocaleDateString();
+      tr.innerHTML = `<td>${date}</td><td>${escapeHtml(f.name)}</td><td>${escapeHtml(f.message)}</td>`;
+      tbody.appendChild(tr);
+    }
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="3">Couldn't load — check your internet.</td></tr>`;
+  }
+});
+$("btn-admin-home").addEventListener("click", () => enterHome());
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 (async function boot() {
@@ -578,9 +639,11 @@ $("btn-history-home").addEventListener("click", () => enterHome());
   try {
     const r = await rpc("arcade", "enter", { p_name: player.name, p_pin: player.pin, p_create: false });
     if (r.ok) {
-      if (r.player_id !== player.id) {
+      if (r.player_id !== player.id || player.admin !== !!r.is_admin) {
         player.id = r.player_id;
+        player.admin = !!r.is_admin;
         localStorage.setItem(PLAYER_KEY, JSON.stringify(player));
+        $("btn-admin-feedback").hidden = !player.admin;
       }
     } else {
       forceSignOut("You were signed out because your account changed on the server. Please sign in again — sorry about that!");

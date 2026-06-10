@@ -49,6 +49,8 @@
           <button class="btn btn-secondary" id="btn-leaderboard">🏆 Top 10</button>
           <button class="btn btn-secondary" id="btn-history">📖 My History</button>
         </div>
+        <button class="btn btn-secondary" id="btn-admin-feedback" hidden>📋 View Feedback (admin)</button>
+        <button class="btn btn-ghost" id="btn-feedback">💬 Send Feedback</button>
         <button class="btn btn-ghost" id="btn-signout">Sign out</button>
       </div>
       <p class="tts-note" id="tts-note" hidden>⚠️ Your browser can't speak words aloud. Try Chrome, Edge, or Safari.</p>
@@ -144,6 +146,32 @@
         <p id="history-bests-empty" class="muted" hidden>No games yet — go play one!</p>
       </div>
       <button class="btn btn-secondary" id="btn-history-home">🏠 Home</button>
+    </section>
+
+    <!-- Feedback screen -->
+    <section id="screen-feedback" class="screen" hidden>
+      <h1 class="logo small">💬 Feedback</h1>
+      <div class="card">
+        <label>What should we improve or fix?
+          <textarea id="feedback-text" rows="5" maxlength="2000" placeholder="Tell us anything…"></textarea>
+        </label>
+        <p id="feedback-msg" class="error" hidden></p>
+        <button class="btn btn-primary" id="btn-send-feedback">Send</button>
+        <button class="btn btn-secondary" id="btn-feedback-home">🏠 Home</button>
+      </div>
+    </section>
+
+    <!-- Admin feedback inbox -->
+    <section id="screen-admin" class="screen" hidden>
+      <h1 class="logo small">📋 Feedback Inbox</h1>
+      <div class="card">
+        <table class="table">
+          <thead><tr><th>Date</th><th>From</th><th>Message</th></tr></thead>
+          <tbody id="admin-feedback-rows"></tbody>
+        </table>
+        <p id="admin-empty" class="muted" hidden>No feedback yet.</p>
+      </div>
+      <button class="btn btn-secondary" id="btn-admin-home">🏠 Home</button>
     </section>
 
   </div>
