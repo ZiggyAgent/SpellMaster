@@ -292,9 +292,33 @@ function nextWordUI() {
   $("game-input").value = "";
   $("game-feedback").hidden = true;
   $("btn-continue").hidden = true;
+  quitArmed = false;
+  $("btn-quit").textContent = "🏠 Exit";
   $("game-input").focus();
   sayCurrentWord();
 }
+
+// Exiting practice is instant; exiting a scored round needs a second tap so
+// one stray touch can't throw away a game in progress (unfinished rounds are
+// never saved).
+let quitArmed = false;
+$("btn-quit").addEventListener("click", () => {
+  if (game && game.mode === "scored" && !quitArmed) {
+    quitArmed = true;
+    $("btn-quit").textContent = "Tap again to exit — this round won't be saved";
+    setTimeout(() => {
+      quitArmed = false;
+      $("btn-quit").textContent = "🏠 Exit";
+    }, 3000);
+    return;
+  }
+  if (canSpeak) speechSynthesis.cancel();
+  game = null;
+  advancing = false;
+  quitArmed = false;
+  $("btn-quit").textContent = "🏠 Exit";
+  enterHome();
+});
 
 function showFeedback(correct, earned, word) {
   const el = $("game-feedback");
