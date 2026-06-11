@@ -597,9 +597,9 @@ $("btn-lb-home").addEventListener("click", () => enterHome());
 // ---------------------------------------------------------------------------
 // History screen
 // ---------------------------------------------------------------------------
-document.querySelectorAll(".tab").forEach((btn) => {
+document.querySelectorAll("#screen-history .tab").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
+    document.querySelectorAll("#screen-history .tab").forEach((b) => b.classList.toggle("active", b === btn));
     ["games", "words", "bests"].forEach((t) => ($("tab-" + t).hidden = t !== btn.dataset.tab));
   });
 });
@@ -688,8 +688,14 @@ $("btn-send-feedback").addEventListener("click", async () => {
   }
 });
 
-$("btn-admin-feedback").addEventListener("click", async () => {
-  show("screen-admin");
+document.querySelectorAll("#screen-admin .tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#screen-admin .tab").forEach((b) => b.classList.toggle("active", b === btn));
+    ["feedback", "usage"].forEach((t) => ($("atab-" + t).hidden = t !== btn.dataset.atab));
+  });
+});
+
+async function loadAdminFeedback() {
   const tbody = $("admin-feedback-rows");
   tbody.innerHTML = `<tr><td colspan="3">Loading…</td></tr>`;
   $("admin-empty").hidden = true;
@@ -710,6 +716,41 @@ $("btn-admin-feedback").addEventListener("click", async () => {
   } catch {
     tbody.innerHTML = `<tr><td colspan="3">Couldn't load — check your internet.</td></tr>`;
   }
+}
+
+async function loadAdminUsage() {
+  const playersBody = $("admin-usage-players");
+  const dailyBody = $("admin-usage-daily");
+  playersBody.innerHTML = `<tr><td colspan="5">Loading…</td></tr>`;
+  dailyBody.innerHTML = "";
+  $("admin-usage-empty").hidden = true;
+  try {
+    const r = await rpc("spelling", "get_usage", { p_player_id: player.id, p_pin: player.pin });
+    playersBody.innerHTML = "";
+    if (!r.ok) {
+      playersBody.innerHTML = `<tr><td colspan="5">${escapeHtml(r.error)}</td></tr>`;
+      return;
+    }
+    for (const p of r.players) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${escapeHtml(p.name)}</td><td>${p.games}</td><td>${p.avg_score ?? "—"}</td><td>${p.last_played ?? "—"}</td><td>${p.days_active}</td>`;
+      playersBody.appendChild(tr);
+    }
+    $("admin-usage-empty").hidden = r.daily.length > 0;
+    for (const d of r.daily) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${d.day}</td><td>${escapeHtml(d.name)}</td><td>${d.games}</td>`;
+      dailyBody.appendChild(tr);
+    }
+  } catch {
+    playersBody.innerHTML = `<tr><td colspan="5">Couldn't load — check your internet.</td></tr>`;
+  }
+}
+
+$("btn-admin-feedback").addEventListener("click", () => {
+  show("screen-admin");
+  loadAdminFeedback();
+  loadAdminUsage();
 });
 $("btn-admin-home").addEventListener("click", () => enterHome());
 
