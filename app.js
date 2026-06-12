@@ -87,7 +87,7 @@ function sayCurrentWord(slow = false) {
   const sentenceRate = slow ? 0.7 : 0.85;
   speechSynthesis.cancel();
   utter(item.w + ".", wordRate);   // the word: slow and clear
-  utter(item.s, sentenceRate);     // the sentence: a bit slower than normal speech
+  if (item.s) utter(item.s, sentenceRate); // sentence (tutorial quiz words have none)
   utter(item.w + ".", wordRate);
 }
 
@@ -318,15 +318,21 @@ function startPracticeSession() {
     : sel.length === withWords.length
       ? "all levels"
       : `Grades ${sel.join(", ")}`;
+  startDrill(entries, `🎯 Practicing ${label}`, "practice");
+}
+
+// Shared engine for unscored drills (practice sessions and tutorial quizzes)
+function startDrill(entries, pillLabel, origin) {
   game = {
     mode: "practice",
+    origin,           // "practice" | "tutorial" — decides where Play Again leads
     round: "main",
     queue: entries,
     index: 0,
     results: [],      // { w, s, p, first_try_correct }
     requeued: new Set(),
   };
-  $("game-round").textContent = `🎯 Practicing ${label}`;
+  $("game-round").textContent = pillLabel;
   $("game-round").hidden = false;
   $("game-points").hidden = true;
   $("score-line").hidden = true;
@@ -336,6 +342,72 @@ function startPracticeSession() {
 
 $("btn-start-practice").addEventListener("click", startPracticeSession);
 $("btn-practice-home").addEventListener("click", () => enterHome());
+
+// ---------------------------------------------------------------------------
+// Tutorials: spelling tips & tricks per grade, with tappable spoken examples
+// and an unscored end-of-tutorial spelling quiz.
+// ---------------------------------------------------------------------------
+fillGradeSelect($("tut-grade-select"));
+let currentTutorial = null;
+
+function renderTutorialList() {
+  const grade = Number($("tut-grade-select").value);
+  const list = $("tutorial-list");
+  list.innerHTML = "";
+  for (const t of TUTORIALS[grade]) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tutorial-item";
+    btn.innerHTML = `${escapeHtml(t.title)}<span class="sub">${escapeHtml(t.patterns.map((p) => p.name).join("  ·  "))}</span>`;
+    btn.addEventListener("click", () => openTutorial(t));
+    list.appendChild(btn);
+  }
+}
+
+function openTutorial(t) {
+  currentTutorial = t;
+  $("tut-title").textContent = `📚 ${t.title}`;
+  $("tut-intro").textContent = t.intro;
+  const wrap = $("tut-patterns");
+  wrap.innerHTML = "";
+  for (const p of t.patterns) {
+    const card = document.createElement("div");
+    card.className = "card pattern-card";
+    card.innerHTML = `<h2>${escapeHtml(p.name)}</h2><p class="pattern-tip">${escapeHtml(p.tip)}</p>` +
+      `<div class="word-chips">` +
+      p.words.map((w) => `<button type="button" class="word-chip">${escapeHtml(w)}</button>`).join("") +
+      `</div>`;
+    wrap.appendChild(card);
+  }
+  wrap.querySelectorAll(".word-chip").forEach((chip) =>
+    chip.addEventListener("click", () => {
+      if (!canSpeak) return;
+      speechSynthesis.cancel();
+      utter(chip.textContent, 0.7);
+    })
+  );
+  show("screen-tutorial");
+}
+
+$("btn-tutorials").addEventListener("click", () => {
+  $("tut-grade-select").value = $("grade-select").value;
+  renderTutorialList();
+  show("screen-tutorials");
+});
+$("tut-grade-select").addEventListener("change", renderTutorialList);
+$("btn-tutorials-home").addEventListener("click", () => enterHome());
+$("btn-tut-back").addEventListener("click", () => show("screen-tutorials"));
+$("btn-tut-home").addEventListener("click", () => enterHome());
+
+$("btn-tut-quiz").addEventListener("click", () => {
+  const words = currentTutorial.patterns.flatMap((p) => p.words);
+  for (let i = words.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [words[i], words[j]] = [words[j], words[i]];
+  }
+  const entries = words.slice(0, 8).map((w) => ({ w, s: "", p: 10 }));
+  startDrill(entries, `📚 ${currentTutorial.title}`, "tutorial");
+});
 
 function nextWordUI() {
   const item = game.queue[game.index];
@@ -489,8 +561,8 @@ function finishPractice() {
     list.appendChild(li);
   }
   $("result-lb-card").hidden = true;
-  $("btn-play-again").textContent = "🎯 Practice Again";
-  lastMode = "practice";
+  $("btn-play-again").textContent = game.origin === "tutorial" ? "📚 Back to Tutorial" : "🎯 Practice Again";
+  lastMode = game.origin;
   show("screen-results");
 }
 
@@ -567,7 +639,11 @@ let lastMode = "scored";
 
 $("btn-start").addEventListener("click", startGame);
 $("btn-practice").addEventListener("click", openPracticeSetup);
-$("btn-play-again").addEventListener("click", () => (lastMode === "practice" ? openPracticeSetup() : startGame()));
+$("btn-play-again").addEventListener("click", () => {
+  if (lastMode === "practice") openPracticeSetup();
+  else if (lastMode === "tutorial") show("screen-tutorial");
+  else startGame();
+});
 $("btn-results-home").addEventListener("click", () => enterHome());
 
 // ---------------------------------------------------------------------------

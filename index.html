@@ -43,7 +43,10 @@
           <select id="grade-select"></select>
         </label>
         <button class="btn btn-primary btn-big" id="btn-start">▶️ Start Game</button>
-        <button class="btn btn-secondary" id="btn-practice">🎯 Practice My Tricky Words</button>
+        <div class="home-row">
+          <button class="btn btn-secondary" id="btn-practice">🎯 Practice</button>
+          <button class="btn btn-secondary" id="btn-tutorials">📚 Tutorials</button>
+        </div>
         <p id="home-msg" class="muted" hidden></p>
         <div class="home-row">
           <button class="btn btn-secondary" id="btn-leaderboard">🏆 Top 10</button>
@@ -149,6 +152,33 @@
       <button class="btn btn-secondary" id="btn-history-home">🏠 Home</button>
     </section>
 
+    <!-- Tutorials list -->
+    <section id="screen-tutorials" class="screen" hidden>
+      <h1 class="logo small">📚 Tutorials</h1>
+      <div class="card">
+        <label class="grade-label">Grade level
+          <select id="tut-grade-select"></select>
+        </label>
+        <div id="tutorial-list"></div>
+      </div>
+      <button class="btn btn-secondary" id="btn-tutorials-home">🏠 Home</button>
+    </section>
+
+    <!-- Single tutorial -->
+    <section id="screen-tutorial" class="screen" hidden>
+      <h1 class="logo small" id="tut-title"></h1>
+      <p class="tut-intro" id="tut-intro"></p>
+      <div id="tut-patterns"></div>
+      <div class="card">
+        <p class="listen-hint">Ready? Spell some of these words by ear:</p>
+        <button class="btn btn-primary" id="btn-tut-quiz">🎤 Try Spelling Them!</button>
+      </div>
+      <div class="home-row">
+        <button class="btn btn-secondary" id="btn-tut-back">📚 All Tutorials</button>
+        <button class="btn btn-secondary" id="btn-tut-home">🏠 Home</button>
+      </div>
+    </section>
+
     <!-- Practice setup screen -->
     <section id="screen-practice-setup" class="screen" hidden>
       <h1 class="logo small">🎯 Practice</h1>
@@ -206,6 +236,7 @@
 
   </div>
   <script src="words.js"></script>
+  <script src="tutorials.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

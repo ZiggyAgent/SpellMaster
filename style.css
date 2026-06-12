@@ -178,6 +178,31 @@ textarea { resize: vertical; font-size: 1rem; font-family: inherit; }
 .grade-chip.selected .cnt { color: var(--primary-dark); }
 .grade-chip:disabled { opacity: .45; cursor: default; }
 
+/* Tutorials */
+.tut-intro { text-align: center; color: var(--ink-soft); font-size: 1.05rem; margin: 4px 0 16px; }
+.tutorial-item {
+  display: block; width: 100%; text-align: left;
+  padding: 14px 16px; margin-top: 10px;
+  border: 1.5px solid var(--line); border-radius: 12px;
+  background: #fff; font-family: inherit; font-size: 1.05rem; font-weight: 700;
+  color: var(--ink); cursor: pointer;
+  transition: border-color .12s ease;
+}
+.tutorial-item:hover { border-color: var(--primary); }
+.tutorial-item .sub { display: block; font-size: .85rem; font-weight: 500; color: var(--ink-soft); margin-top: 2px; }
+.pattern-card h2 { text-align: left; font-size: 1.05rem; margin-bottom: 4px; color: var(--primary-dark); }
+.pattern-tip { margin: 0 0 12px; color: var(--ink-soft); font-size: .95rem; }
+.word-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.word-chip {
+  padding: 8px 14px; border-radius: 999px;
+  border: 1.5px solid #c7d2fe; background: var(--primary-soft);
+  font-family: inherit; font-weight: 700; font-size: 1rem;
+  color: var(--primary-dark); cursor: pointer; letter-spacing: .5px;
+  transition: background .12s ease;
+}
+.word-chip:hover { background: #e0e7ff; }
+.word-chip:active { transform: scale(.97); }
+
 /* Tabs */
 .tabs { display: flex; gap: 0; margin-bottom: 14px; background: #e2e8f0; border-radius: 12px; padding: 4px; }
 .tab {
