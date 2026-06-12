@@ -415,7 +415,13 @@ $("btn-tut-quiz").addEventListener("click", () => {
     const j = Math.floor(Math.random() * (i + 1));
     [words[i], words[j]] = [words[j], words[i]];
   }
-  const entries = words.slice(0, 8).map((w) => ({ w, s: "", p: 10 }));
+  // word + example sentence, like the main game: reuse the bank's sentence
+  // when the word exists there, else the tutorial supplement
+  const entries = words.slice(0, 8).map((w) => ({
+    w,
+    s: WORD_INDEX.get(w.toLowerCase())?.s || TUT_SENTENCES[w.toLowerCase()] || "",
+    p: 10,
+  }));
   startDrill(entries, `📚 ${currentTutorial.title}`, "tutorial");
 });
 
