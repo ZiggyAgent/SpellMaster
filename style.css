@@ -190,7 +190,18 @@ textarea { resize: vertical; font-size: 1rem; font-family: inherit; }
 }
 .tutorial-item:hover { border-color: var(--primary); }
 .tutorial-item .sub { display: block; font-size: .85rem; font-weight: 500; color: var(--ink-soft); margin-top: 2px; }
-.pattern-card h2 { text-align: left; font-size: 1.05rem; margin-bottom: 4px; color: var(--primary-dark); }
+.pattern-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+.pattern-card h2 { text-align: left; font-size: 1.05rem; margin: 0; color: var(--primary-dark); }
+.btn-listen {
+  flex-shrink: 0;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1.5px solid #c7d2fe; background: var(--primary-soft);
+  font-family: inherit; font-weight: 700; font-size: .85rem;
+  color: var(--primary-dark); cursor: pointer;
+  transition: background .12s ease;
+}
+.btn-listen:hover { background: #e0e7ff; }
+.btn-listen:active { transform: scale(.97); }
 .pattern-tip { margin: 0 0 12px; color: var(--ink-soft); font-size: .95rem; }
 .word-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .word-chip {

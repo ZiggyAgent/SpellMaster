@@ -373,10 +373,20 @@ function openTutorial(t) {
   for (const p of t.patterns) {
     const card = document.createElement("div");
     card.className = "card pattern-card";
-    card.innerHTML = `<h2>${escapeHtml(p.name)}</h2><p class="pattern-tip">${escapeHtml(p.tip)}</p>` +
+    card.innerHTML = `<div class="pattern-head"><h2>${escapeHtml(p.name)}</h2>` +
+      `<button type="button" class="btn-listen">🔊 Listen</button></div>` +
+      `<p class="pattern-tip">${escapeHtml(p.tip)}</p>` +
       `<div class="word-chips">` +
       p.words.map((w) => `<button type="button" class="word-chip">${escapeHtml(w)}</button>`).join("") +
       `</div>`;
+    // Read the tip, then each example word slowly so the target sound stands out
+    card.querySelector(".btn-listen").addEventListener("click", () => {
+      if (!canSpeak) return;
+      speechSynthesis.cancel();
+      utter(p.tip, 0.9);
+      utter("For example:", 0.95);
+      for (const w of p.words) utter(w + ".", 0.6);
+    });
     wrap.appendChild(card);
   }
   wrap.querySelectorAll(".word-chip").forEach((chip) =>
