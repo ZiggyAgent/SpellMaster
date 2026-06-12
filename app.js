@@ -508,11 +508,18 @@ $("game-form").addEventListener("submit", (e) => {
   let earned = 0;
   if (game.round === "main") {
     earned = correct ? item.p : 0;
-    game.results.push({ ...item, first_try_correct: correct, retry_correct: null, earned });
+    game.results.push({
+      ...item,
+      first_try_correct: correct,
+      retry_correct: null,
+      earned,
+      first_attempt: correct ? null : guess, // what they typed — fuels mistake analysis
+    });
   } else {
     earned = correct ? item.p / 2 : 0;
     const r = game.results.find((x) => x.w === item.w);
     r.retry_correct = correct;
+    r.retry_attempt = correct ? null : guess;
     r.earned = earned;
   }
   game.score += earned;
@@ -589,6 +596,8 @@ async function finishGame() {
     points: r.p,
     first_try_correct: r.first_try_correct,
     retry_correct: r.retry_correct,
+    first_attempt: r.first_attempt ?? null,
+    retry_attempt: r.retry_attempt ?? null,
   }));
   const maxScore = game.results.reduce((s, r) => s + r.p, 0);
 
