@@ -189,6 +189,11 @@ textarea { resize: vertical; font-size: 1rem; font-family: inherit; }
   transition: border-color .12s ease;
 }
 .tutorial-item:hover { border-color: var(--primary); }
+.tutorial-item .star { float: right; }
+#mfy-card { border-color: #fde68a; background: linear-gradient(180deg, #fffbeb, #fff); }
+#mfy-card .tutorial-item { border-color: #fde68a; }
+.pattern-card.bonus { border-color: #fde68a; background: linear-gradient(180deg, #fffbeb, #fff); }
+.pattern-card.bonus h2 { color: var(--accent); }
 .tutorial-item .sub { display: block; font-size: .85rem; font-weight: 500; color: var(--ink-soft); margin-top: 2px; }
 .pattern-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
 .pattern-card h2 { text-align: left; font-size: 1.05rem; margin: 0; color: var(--primary-dark); }

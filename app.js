@@ -152,6 +152,8 @@ $("auth-form").addEventListener("submit", async (e) => {
 $("btn-signout").addEventListener("click", () => {
   localStorage.removeItem(PLAYER_KEY);
   player = null;
+  myRecommendations = [];
+  $("btn-tutorials").textContent = "📚 Tutorials";
   $("auth-name").value = "";
   $("auth-pin").value = "";
   resetAuthMode();
@@ -164,6 +166,8 @@ function forceSignOut(message) {
   localStorage.removeItem(PLAYER_KEY);
   player = null;
   game = null;
+  myRecommendations = [];
+  $("btn-tutorials").textContent = "📚 Tutorials";
   $("auth-name").value = "";
   $("auth-pin").value = "";
   resetAuthMode();
@@ -195,6 +199,7 @@ function enterHome(isNew = false) {
   $("grade-select").value = localStorage.getItem(GRADE_KEY) || "1";
   $("tts-note").hidden = canSpeak;
   show("screen-home");
+  refreshRecommendations(); // async: updates the Tutorials badge + new-lesson banner
 }
 
 $("grade-select").addEventListener("change", (e) => localStorage.setItem(GRADE_KEY, e.target.value));
@@ -349,6 +354,120 @@ $("btn-practice-home").addEventListener("click", () => enterHome());
 // ---------------------------------------------------------------------------
 fillGradeSelect($("tut-grade-select"));
 let currentTutorial = null;
+let currentBonus = null; // synthetic "Words you've been missing" card, when opened from a recommendation
+
+// ---------------------------------------------------------------------------
+// Adaptive recommendations: detect repeated spelling-pattern mistakes and
+// surface the matching tutorial with the player's own missed words mixed in.
+// ---------------------------------------------------------------------------
+const SEEN_KEY = "spellmaster_seen_recs";
+const REC_THRESHOLD = 3; // misses of the same pattern before we recommend it
+let myRecommendations = []; // [{ id, tutorial:{grade,title}, count, words:[...] }]
+
+function findTutorial(grade, title) {
+  return (TUTORIALS[grade] || []).find((t) => t.title === title) || null;
+}
+
+// Count each miss against every pattern it matches. The typo "gate": if the
+// attempt still contains the correct pattern substring, the child got THIS
+// pattern right (erred elsewhere), so it doesn't count toward this pattern.
+function analyzeMistakes(mistakes) {
+  const acc = new Map(); // id -> { count, words:Set }
+  for (const m of mistakes) {
+    const word = (m.word || "").toLowerCase();
+    const attempt = (m.attempt || "").toLowerCase();
+    if (!word) continue;
+    for (const c of PATTERN_CATEGORIES) {
+      const span = c.detect(word);
+      if (!span) continue;
+      if (attempt && typeof span === "string" && attempt.includes(span)) continue;
+      let e = acc.get(c.id);
+      if (!e) { e = { count: 0, words: new Set() }; acc.set(c.id, e); }
+      e.count++;
+      e.words.add(word);
+    }
+  }
+  const out = [];
+  for (const c of PATTERN_CATEGORIES) {
+    const e = acc.get(c.id);
+    if (e && e.count >= REC_THRESHOLD && findTutorial(c.tutorial.grade, c.tutorial.title)) {
+      out.push({ id: c.id, tutorial: c.tutorial, count: e.count, words: [...e.words] });
+    }
+  }
+  out.sort((a, b) => b.count - a.count);
+  return out;
+}
+
+async function refreshRecommendations() {
+  if (!player) return;
+  try {
+    const r = await rpc("spelling", "get_mistakes", { p_player_id: player.id, p_pin: player.pin });
+    if (!r.ok) return;
+    myRecommendations = analyzeMistakes(r.mistakes);
+  } catch { return; }
+  updateRecUI();
+}
+
+function updateRecUI() {
+  const n = myRecommendations.length;
+  $("btn-tutorials").textContent = n ? `📚 Tutorials ⭐${n}` : "📚 Tutorials";
+  // Forget cleared weaknesses so a recurring one can alert again.
+  const ids = myRecommendations.map((r) => r.id);
+  let seen = JSON.parse(localStorage.getItem(SEEN_KEY) || "[]").filter((id) => ids.includes(id));
+  localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+  const fresh = myRecommendations.filter((r) => !seen.includes(r.id));
+  if (fresh.length && !$("screen-home").hidden) {
+    const t = findTutorial(fresh[0].tutorial.grade, fresh[0].tutorial.title);
+    $("home-rec").textContent = `⭐ New lesson ready for you: ${t.title}! Tap 📚 Tutorials.`;
+    $("home-rec").hidden = false;
+  } else {
+    $("home-rec").hidden = true;
+  }
+}
+
+function renderMadeForYou() {
+  const card = $("mfy-card"), list = $("mfy-list");
+  list.innerHTML = "";
+  if (!myRecommendations.length) { card.hidden = true; return; }
+  card.hidden = false;
+  for (const rec of myRecommendations) {
+    const t = findTutorial(rec.tutorial.grade, rec.tutorial.title);
+    if (!t) continue;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tutorial-item";
+    btn.innerHTML = `${escapeHtml(t.title)} <span class="star">⭐</span>` +
+      `<span class="sub">Because you've missed ${rec.count} word${rec.count === 1 ? "" : "s"} like this — Grade ${rec.tutorial.grade} lesson</span>`;
+    btn.addEventListener("click", () => openTutorial(t, rec));
+    list.appendChild(btn);
+  }
+}
+
+function renderPatternCard(p, wrap, isBonus) {
+  const card = document.createElement("div");
+  card.className = "card pattern-card" + (isBonus ? " bonus" : "");
+  card.innerHTML = `<div class="pattern-head"><h2>${escapeHtml(p.name)}</h2>` +
+    `<button type="button" class="btn-listen">🔊 Listen</button></div>` +
+    `<p class="pattern-tip">${escapeHtml(p.tip)}</p>` +
+    `<div class="word-chips">` +
+    p.words.map((w) => `<button type="button" class="word-chip">${escapeHtml(w)}</button>`).join("") +
+    `</div>`;
+  card.querySelector(".btn-listen").addEventListener("click", () => {
+    if (!canSpeak) return;
+    speechSynthesis.cancel();
+    utter(p.tip, 0.9);
+    utter("For example:", 0.95);
+    for (const w of p.words) utter(w + ".", 0.6);
+  });
+  card.querySelectorAll(".word-chip").forEach((chip) =>
+    chip.addEventListener("click", () => {
+      if (!canSpeak) return;
+      speechSynthesis.cancel();
+      utter(chip.textContent, 0.7);
+    })
+  );
+  wrap.appendChild(card);
+}
 
 function renderTutorialList() {
   const grade = Number($("tut-grade-select").value);
@@ -364,44 +483,36 @@ function renderTutorialList() {
   }
 }
 
-function openTutorial(t) {
+function openTutorial(t, rec) {
   currentTutorial = t;
+  currentBonus = null;
   $("tut-title").textContent = `📚 ${t.title}`;
   $("tut-intro").textContent = t.intro;
   const wrap = $("tut-patterns");
   wrap.innerHTML = "";
-  for (const p of t.patterns) {
-    const card = document.createElement("div");
-    card.className = "card pattern-card";
-    card.innerHTML = `<div class="pattern-head"><h2>${escapeHtml(p.name)}</h2>` +
-      `<button type="button" class="btn-listen">🔊 Listen</button></div>` +
-      `<p class="pattern-tip">${escapeHtml(p.tip)}</p>` +
-      `<div class="word-chips">` +
-      p.words.map((w) => `<button type="button" class="word-chip">${escapeHtml(w)}</button>`).join("") +
-      `</div>`;
-    // Read the tip, then each example word slowly so the target sound stands out
-    card.querySelector(".btn-listen").addEventListener("click", () => {
-      if (!canSpeak) return;
-      speechSynthesis.cancel();
-      utter(p.tip, 0.9);
-      utter("For example:", 0.95);
-      for (const w of p.words) utter(w + ".", 0.6);
-    });
-    wrap.appendChild(card);
+  // When opened from a recommendation, lead with the child's actual missed words
+  if (rec && rec.words.length) {
+    const bonusWords = rec.words.filter((w) => WORD_INDEX.has(w.toLowerCase())).slice(0, 8);
+    if (bonusWords.length) {
+      currentBonus = {
+        name: "⭐ Words you've been missing",
+        tip: "You've missed these before — let's master them!",
+        words: bonusWords,
+      };
+      renderPatternCard(currentBonus, wrap, true);
+    }
   }
-  wrap.querySelectorAll(".word-chip").forEach((chip) =>
-    chip.addEventListener("click", () => {
-      if (!canSpeak) return;
-      speechSynthesis.cancel();
-      utter(chip.textContent, 0.7);
-    })
-  );
+  for (const p of t.patterns) renderPatternCard(p, wrap, false);
   show("screen-tutorial");
 }
 
 $("btn-tutorials").addEventListener("click", () => {
   $("tut-grade-select").value = $("grade-select").value;
+  renderMadeForYou();
   renderTutorialList();
+  // opening the list counts as seeing the current recommendations
+  localStorage.setItem(SEEN_KEY, JSON.stringify(myRecommendations.map((r) => r.id)));
+  $("home-rec").hidden = true;
   show("screen-tutorials");
 });
 $("tut-grade-select").addEventListener("change", renderTutorialList);
@@ -410,7 +521,11 @@ $("btn-tut-back").addEventListener("click", () => show("screen-tutorials"));
 $("btn-tut-home").addEventListener("click", () => enterHome());
 
 $("btn-tut-quiz").addEventListener("click", () => {
-  const words = currentTutorial.patterns.flatMap((p) => p.words);
+  const base = currentTutorial.patterns.flatMap((p) => p.words);
+  const merged = currentBonus ? [...currentBonus.words, ...base] : base;
+  // de-dupe (a missed word can also be a tutorial example), case-insensitively
+  const seen = new Set();
+  const words = merged.filter((w) => { const k = w.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   for (let i = words.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [words[i], words[j]] = [words[j], words[i]];
