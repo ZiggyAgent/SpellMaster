@@ -58,8 +58,14 @@ that risks a paid tier during planning, before building.
 - **Migrations are files:** save every SQL change as a numbered file in the
   repo's `supabase/` folder, then run it yourself via the API. Never leave DB
   work for Tal.
-- **Keep-alive already exists** (GitHub Action in the CapitalCityGlobeGame
-  repo pings the project every 3 days, project-wide). Don't add another.
+- **Keep-alive already exists** (`supabase-keepalive.yml` in the
+  CapitalCityGlobeGame repo, project-wide — covers every game). Don't add
+  another. It runs every 6h making real anon-RPC pings AND self-commits a
+  `.keepalive-heartbeat` each run. That heartbeat matters: GitHub auto-disables
+  a public repo's scheduled cron after 60 days with no pushes (this paused the
+  project in Oct 2026), so the self-commit keeps the repo active. Don't revert
+  it. Restore a paused project: `POST /v1/projects/{ref}/restore` (Management
+  API, token in `~/.supabase_access_token`).
 
 ## Git & hosting
 
