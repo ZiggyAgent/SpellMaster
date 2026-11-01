@@ -65,7 +65,9 @@ that risks a paid tier during planning, before building.
   a public repo's scheduled cron after 60 days with no pushes (this paused the
   project in Oct 2026), so the self-commit keeps the repo active. Don't revert
   it. Restore a paused project: `POST /v1/projects/{ref}/restore` (Management
-  API, token in `~/.supabase_access_token`).
+  API, token in `~/.supabase_access_token`). An independent daily **watchdog** workflow (also
+  in CapitalCityGlobeGame, `watchdog.yml`) fails loud/emails if the keepalive
+  goes stale or the project stops answering — early warning before a pause.
 
 ## Git & hosting
 
