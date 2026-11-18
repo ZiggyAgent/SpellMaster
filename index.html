@@ -39,6 +39,11 @@
       <h1 class="logo">🐝 SpellMaster</h1>
       <p class="welcome">Hi, <span id="home-name"></span>! 👋</p>
       <p class="congrats" id="home-new" hidden>🎉 Your account was created — welcome to SpellMaster!</p>
+      <button type="button" id="level-widget" class="level-widget" hidden>
+        <div class="level-top"><span id="level-rank"></span><span id="level-xp"></span></div>
+        <div class="level-bar"><div id="level-fill" class="level-fill"></div></div>
+        <div id="level-next" class="level-next"></div>
+      </button>
       <div class="card">
         <label class="grade-label">Pick your grade level
           <select id="grade-select"></select>
@@ -54,6 +59,7 @@
           <button class="btn btn-secondary" id="btn-leaderboard">🏆 Top 10</button>
           <button class="btn btn-secondary" id="btn-history">📖 My History</button>
         </div>
+        <button class="btn btn-secondary" id="btn-trophies">🏆 Trophy Case</button>
         <button class="btn btn-secondary" id="btn-admin-feedback" hidden>🛠 Admin Panel</button>
         <button class="btn btn-ghost" id="btn-feedback">💬 Send Feedback</button>
         <button class="btn btn-ghost" id="btn-signout">Sign out</button>
@@ -91,6 +97,7 @@
       <div class="card">
         <div id="result-stars" class="stars"></div>
         <p id="result-newbest" class="newbest" hidden>🌟 NEW BEST! 🌟</p>
+        <div id="result-badges" class="result-badges" hidden></div>
         <p class="final-score" id="result-summary"></p>
         <ul id="result-words" class="word-results"></ul>
       </div>
@@ -199,6 +206,21 @@
       </div>
     </section>
 
+    <!-- Trophy case screen -->
+    <section id="screen-trophies" class="screen" hidden>
+      <h1 class="logo small">🏆 Trophy Case</h1>
+      <div class="card">
+        <div class="level-top big"><span id="trophy-rank"></span><span id="trophy-xp"></span></div>
+        <div class="level-bar"><div id="trophy-fill" class="level-fill"></div></div>
+        <div id="trophy-next" class="level-next"></div>
+      </div>
+      <div class="card">
+        <p id="trophy-count" class="muted"></p>
+        <div id="badge-grid" class="badge-grid"></div>
+      </div>
+      <button class="btn btn-secondary" id="btn-trophies-home">🏠 Home</button>
+    </section>
+
     <!-- Feedback screen -->
     <section id="screen-feedback" class="screen" hidden>
       <h1 class="logo small">💬 Feedback</h1>
@@ -247,6 +269,7 @@
   <script src="tutorials.js"></script>
   <script src="patterns.js"></script>
   <script src="fun.js"></script>
+  <script src="rewards.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -178,6 +178,41 @@ textarea { resize: vertical; font-size: 1rem; font-family: inherit; }
 .grade-chip.selected .cnt { color: var(--primary-dark); }
 .grade-chip:disabled { opacity: .45; cursor: default; }
 
+/* Tier 2: level bar + trophy case */
+.level-widget {
+  display: block; width: 100%; text-align: left;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 16px; margin: 0 auto 16px; max-width: 560px;
+  font-family: inherit; cursor: pointer; box-shadow: 0 4px 14px rgba(15,23,42,.05);
+}
+.level-widget:hover { border-color: var(--primary); }
+.level-top { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; }
+.level-top.big { font-size: 1.15rem; margin-bottom: 8px; }
+.level-top span:last-child { color: var(--ink-soft); font-weight: 600; font-size: .9rem; }
+.level-bar { height: 10px; border-radius: 999px; background: #e2e8f0; overflow: hidden; margin: 7px 0 4px; }
+.level-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6366f1, #a855f7); transition: width .6s ease; }
+.level-next { font-size: .82rem; color: var(--ink-soft); }
+
+.badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.badge {
+  text-align: center; padding: 12px 6px; border-radius: 14px;
+  border: 1.5px solid var(--line); background: #fff;
+}
+.badge.earned { border-color: #fde68a; background: linear-gradient(180deg, #fffbeb, #fff); }
+.badge.locked { opacity: .55; }
+.badge .ico { font-size: 1.9rem; line-height: 1; filter: grayscale(1); }
+.badge.earned .ico { filter: none; }
+.badge .bname { font-weight: 700; font-size: .82rem; margin-top: 5px; }
+.badge .bdesc { font-size: .72rem; color: var(--ink-soft); margin-top: 2px; }
+
+.result-badges {
+  margin: 0 0 12px; padding: 12px; border-radius: 12px;
+  background: linear-gradient(180deg, #fffbeb, #fff); border: 1.5px solid #fde68a;
+  text-align: center; animation: combo-pop .35s ease;
+}
+.result-badges .rb-title { font-weight: 800; color: var(--accent); margin-bottom: 6px; }
+.result-badges .rb-item { font-weight: 700; font-size: 1.05rem; }
+
 /* Juice: sound toggle, streak combos, star ratings, new-best */
 .sound-toggle {
   position: fixed; top: 12px; right: 12px; z-index: 50;

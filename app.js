@@ -153,7 +153,9 @@ $("btn-signout").addEventListener("click", () => {
   localStorage.removeItem(PLAYER_KEY);
   player = null;
   myRecommendations = [];
+  myProfile = { xp: 0, games: 0, earned: [] };
   $("btn-tutorials").textContent = "📚 Tutorials";
+  $("level-widget").hidden = true;
   $("auth-name").value = "";
   $("auth-pin").value = "";
   resetAuthMode();
@@ -167,7 +169,9 @@ function forceSignOut(message) {
   player = null;
   game = null;
   myRecommendations = [];
+  myProfile = { xp: 0, games: 0, earned: [] };
   $("btn-tutorials").textContent = "📚 Tutorials";
+  $("level-widget").hidden = true;
   $("auth-name").value = "";
   $("auth-pin").value = "";
   resetAuthMode();
@@ -200,6 +204,7 @@ function enterHome(isNew = false) {
   $("tts-note").hidden = canSpeak;
   show("screen-home");
   refreshRecommendations(); // async: updates the Tutorials badge + new-lesson banner
+  refreshProfile();         // async: updates the Speller Level widget
 }
 
 $("grade-select").addEventListener("change", (e) => localStorage.setItem(GRADE_KEY, e.target.value));
@@ -731,6 +736,7 @@ function finishPractice() {
     `You spelled <strong>${good}</strong> of <strong>${total}</strong> tricky words right on the first try`;
   renderStars(starsFor(good, total));
   $("result-newbest").hidden = true;
+  $("result-badges").hidden = true;
   const list = $("result-words");
   list.innerHTML = "";
   for (const r of game.results) {
@@ -765,6 +771,7 @@ async function finishGame() {
     `You scored <strong>${fmt(game.score)}</strong> out of ${fmt(maxScore)} points`;
   renderStars(starsFor(firstTry, game.results.length));
   $("result-newbest").hidden = true;
+  $("result-badges").hidden = true;
   $("result-lb-card").hidden = false;
   $("btn-play-again").textContent = "▶️ Play Again";
   lastMode = "scored";
@@ -808,10 +815,23 @@ async function finishGame() {
     $("result-lb-congrats").hidden = !madeIt;
     renderLeaderboard($("result-lb-table").querySelector("tbody"), lb, saved.ok ? Number(saved.score) : null);
 
-    // Celebrate a perfect round or a new personal best (nothing to beat on the first game).
+    // New personal best (nothing to beat on the first game at a grade).
     const newBest = prevBest !== null && game.score > prevBest;
     $("result-newbest").hidden = !newBest;
-    if (perfect || newBest) { SFX.fanfare(); confetti(); }
+
+    // Award badges + refresh XP now that the game is saved and counts.
+    let newIds = [];
+    try {
+      const bf = await rpc("spelling", "sync_badges", { p_player_id: player.id, p_pin: player.pin });
+      if (bf.ok) {
+        myProfile = { xp: Number(bf.xp) || 0, games: bf.games || 0, earned: bf.earned || [] };
+        renderLevelWidget();
+        newIds = Array.isArray(bf.new) ? bf.new : [];
+      }
+    } catch { /* offline — skip badges */ }
+    if (newIds.length) showNewBadges(newIds);
+
+    if (perfect || newBest || newIds.length) { SFX.fanfare(); confetti(); }
     else { SFX.complete(); }
   } catch (err) {
     $("result-lb-table").querySelector("tbody").innerHTML =
@@ -834,6 +854,73 @@ function renderLeaderboard(tbody, rows, highlightScore) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+// ---------------------------------------------------------------------------
+// Tier 2 rewards: Speller Level (XP) widget + badge trophy case.
+// XP = lifetime sum of game scores (derived server-side). sync_badges also
+// awards any newly-earned badges and returns them.
+// ---------------------------------------------------------------------------
+let myProfile = { xp: 0, games: 0, earned: [] };
+
+async function refreshProfile() {
+  if (!player) return;
+  try {
+    const r = await rpc("spelling", "sync_badges", { p_player_id: player.id, p_pin: player.pin });
+    if (!r.ok) return;
+    myProfile = { xp: Number(r.xp) || 0, games: r.games || 0, earned: r.earned || [] };
+  } catch { return; }
+  renderLevelWidget();
+}
+
+function levelLine(info, setId) {
+  $(setId + "-rank").textContent = `${info.rank.icon} ${info.rank.name}`;
+  $(setId + "-xp").textContent = `${fmt(myProfile.xp)} XP`;
+  $(setId + "-fill").style.width = info.pct + "%";
+  $(setId + "-next").textContent = info.next
+    ? `${fmt(info.span - info.intoLevel)} XP to ${info.next.icon} ${info.next.name}`
+    : "Max rank — you're a legend! 👑";
+}
+
+function renderLevelWidget() {
+  const w = $("level-widget");
+  if (!w) return;
+  if (!myProfile.games) { w.hidden = true; return; }
+  levelLine(rankFor(myProfile.xp), "level");
+  w.hidden = false;
+}
+
+function openTrophies() {
+  levelLine(rankFor(myProfile.xp), "trophy");
+  const earned = new Set(myProfile.earned.map((b) => b.id));
+  $("trophy-count").textContent = `${earned.size} of ${BADGE_ORDER.length} trophies earned`;
+  const grid = $("badge-grid");
+  grid.innerHTML = "";
+  for (const id of BADGE_ORDER) {
+    const def = BADGE_DEFS[id];
+    const has = earned.has(id);
+    const el = document.createElement("div");
+    el.className = "badge " + (has ? "earned" : "locked");
+    el.innerHTML = `<div class="ico">${def.e}</div>` +
+      `<div class="bname">${has ? escapeHtml(def.n) : "Locked"}</div>` +
+      `<div class="bdesc">${escapeHtml(def.d)}</div>`;
+    grid.appendChild(el);
+  }
+  show("screen-trophies");
+}
+
+function showNewBadges(ids) {
+  const el = $("result-badges");
+  const items = ids.map((id) => {
+    const d = BADGE_DEFS[id];
+    return d ? `<div class="rb-item">${d.e} ${escapeHtml(d.n)}</div>` : "";
+  }).join("");
+  el.innerHTML = `<div class="rb-title">🏆 New troph${ids.length > 1 ? "ies" : "y"} unlocked!</div>${items}`;
+  el.hidden = false;
+}
+
+$("btn-trophies").addEventListener("click", openTrophies);
+$("btn-trophies-home").addEventListener("click", () => enterHome());
+$("level-widget").addEventListener("click", openTrophies);
 
 let lastMode = "scored";
 
