@@ -225,6 +225,8 @@ function startGame() {
     queue: pickWords(grade, 10),
     index: 0,
     score: 0,
+    streak: 0,
+    bestStreak: 0,
     results: [], // { w, s, p, first_try_correct, retry_correct, earned }
   };
   $("game-round").hidden = true;
@@ -334,6 +336,8 @@ function startDrill(entries, pillLabel, origin) {
     round: "main",
     queue: entries,
     index: 0,
+    streak: 0,
+    bestStreak: 0,
     results: [],      // { w, s, p, first_try_correct }
     requeued: new Set(),
   };
@@ -579,15 +583,34 @@ $("btn-quit").addEventListener("click", () => {
   enterHome();
 });
 
-function showFeedback(correct, earned, word) {
+function showFeedback(correct, earned, word, streak) {
   const el = $("game-feedback");
   el.className = "feedback " + (correct ? "good" : "bad");
   if (correct) {
     el.innerHTML = earned === null ? "✅ Correct!" : `✅ Correct! +${fmt(earned)} points`;
+    if (streak >= 3) {
+      const msg = streak >= 7 ? `🔥🔥 ${streak} in a row — Unstoppable!`
+        : streak >= 5 ? `🔥 ${streak} in a row — On fire!`
+        : `🔥 ${streak} in a row!`;
+      el.innerHTML += `<div class="combo">${msg}</div>`;
+    }
   } else {
     el.innerHTML = `❌ Not quite! It's spelled:<span class="spelled">${word.toUpperCase()}</span>`;
   }
   el.hidden = false;
+}
+
+// Update the streak counter and play the matching sound on each answer.
+function registerAnswer(correct) {
+  if (correct) {
+    game.streak = (game.streak || 0) + 1;
+    game.bestStreak = Math.max(game.bestStreak || 0, game.streak);
+    SFX.correct();
+    if (game.streak >= 3) SFX.streak(game.streak);
+  } else {
+    game.streak = 0;
+    SFX.wrong();
+  }
 }
 
 let advancing = false;
@@ -604,7 +627,8 @@ $("game-form").addEventListener("submit", (e) => {
     if (!game.results.some((r) => r.w === item.w)) {
       game.results.push({ ...item, first_try_correct: correct });
     }
-    showFeedback(correct, null, item.w);
+    registerAnswer(correct);
+    showFeedback(correct, null, item.w, game.streak);
     advancing = true;
     if (correct) {
       setTimeout(advanceWord, 1100);
@@ -639,7 +663,8 @@ $("game-form").addEventListener("submit", (e) => {
   }
   game.score += earned;
   $("game-score").textContent = fmt(game.score);
-  showFeedback(correct, earned, item.w);
+  registerAnswer(correct);
+  showFeedback(correct, earned, item.w, game.streak);
   advancing = true;
 
   if (correct) {
@@ -684,6 +709,19 @@ $("btn-continue").addEventListener("click", advanceWord);
 $("btn-hear").addEventListener("click", () => sayCurrentWord(false));
 $("btn-hear-slow").addEventListener("click", () => sayCurrentWord(true));
 
+function renderStars(n) {
+  const el = $("result-stars");
+  if (!el) return;
+  el.innerHTML = [1, 2, 3].map((i) => `<span class="star-pip ${i <= n ? "lit" : ""}">★</span>`).join("");
+}
+
+// 3 stars for a clean sweep, 2 for 70%+ first-try, 1 for finishing.
+function starsFor(good, total) {
+  if (total === 0) return 1;
+  if (good === total) return 3;
+  return good / total >= 0.7 ? 2 : 1;
+}
+
 function finishPractice() {
   if (canSpeak) speechSynthesis.cancel();
   const total = game.results.length;
@@ -691,6 +729,8 @@ function finishPractice() {
   $("result-title").textContent = "🎯 Practice Complete!";
   $("result-summary").innerHTML =
     `You spelled <strong>${good}</strong> of <strong>${total}</strong> tricky words right on the first try`;
+  renderStars(starsFor(good, total));
+  $("result-newbest").hidden = true;
   const list = $("result-words");
   list.innerHTML = "";
   for (const r of game.results) {
@@ -702,6 +742,7 @@ function finishPractice() {
   $("btn-play-again").textContent = game.origin === "tutorial" ? "📚 Back to Tutorial" : "🎯 Practice Again";
   lastMode = game.origin;
   show("screen-results");
+  if (good === total && total > 0) { SFX.fanfare(); confetti(); } else { SFX.complete(); }
 }
 
 async function finishGame() {
@@ -716,9 +757,14 @@ async function finishGame() {
   }));
   const maxScore = game.results.reduce((s, r) => s + r.p, 0);
 
+  const firstTry = game.results.filter((r) => r.first_try_correct).length;
+  const perfect = firstTry === game.results.length;
+
   $("result-title").textContent = "🎉 Round Complete!";
   $("result-summary").innerHTML =
     `You scored <strong>${fmt(game.score)}</strong> out of ${fmt(maxScore)} points`;
+  renderStars(starsFor(firstTry, game.results.length));
+  $("result-newbest").hidden = true;
   $("result-lb-card").hidden = false;
   $("btn-play-again").textContent = "▶️ Play Again";
   lastMode = "scored";
@@ -735,6 +781,14 @@ async function finishGame() {
   show("screen-results");
 
   try {
+    // Previous best for this grade must be read BEFORE saving (save updates it).
+    const prevBests = await rpc("spelling", "get_personal_bests", { p_player_id: player.id, p_pin: player.pin });
+    let prevBest = null;
+    if (prevBests.ok) {
+      const b = prevBests.bests.find((x) => Number(x.grade) === game.grade);
+      if (b) prevBest = Number(b.best_score);
+    }
+
     const saved = await rpc("spelling", "save_game", {
       p_player_id: player.id,
       p_pin: player.pin,
@@ -753,6 +807,12 @@ async function finishGame() {
     const madeIt = saved.ok && lb.some((row) => row.name === player.name && Number(row.score) === Number(saved.score));
     $("result-lb-congrats").hidden = !madeIt;
     renderLeaderboard($("result-lb-table").querySelector("tbody"), lb, saved.ok ? Number(saved.score) : null);
+
+    // Celebrate a perfect round or a new personal best (nothing to beat on the first game).
+    const newBest = prevBest !== null && game.score > prevBest;
+    $("result-newbest").hidden = !newBest;
+    if (perfect || newBest) { SFX.fanfare(); confetti(); }
+    else { SFX.complete(); }
   } catch (err) {
     $("result-lb-table").querySelector("tbody").innerHTML =
       `<tr><td colspan="4">Couldn't save your game — check your internet. 😢</td></tr>`;
@@ -776,6 +836,15 @@ function escapeHtml(s) {
 }
 
 let lastMode = "scored";
+
+function updateSoundBtn() {
+  const b = $("btn-sound");
+  if (b) b.textContent = SFX.isOn() ? "🔊" : "🔇";
+}
+if ($("btn-sound")) {
+  $("btn-sound").addEventListener("click", () => { SFX.toggle(); updateSoundBtn(); });
+  updateSoundBtn();
+}
 
 $("btn-start").addEventListener("click", startGame);
 $("btn-practice").addEventListener("click", openPracticeSetup);

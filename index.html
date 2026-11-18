@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <button id="btn-sound" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
   <div class="app">
 
     <!-- Auth screen -->
@@ -88,6 +89,8 @@
     <section id="screen-results" class="screen" hidden>
       <h1 class="logo small" id="result-title">🎉 Round Complete!</h1>
       <div class="card">
+        <div id="result-stars" class="stars"></div>
+        <p id="result-newbest" class="newbest" hidden>🌟 NEW BEST! 🌟</p>
         <p class="final-score" id="result-summary"></p>
         <ul id="result-words" class="word-results"></ul>
       </div>
@@ -243,6 +246,7 @@
   <script src="words.js"></script>
   <script src="tutorials.js"></script>
   <script src="patterns.js"></script>
+  <script src="fun.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
