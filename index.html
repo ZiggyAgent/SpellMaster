@@ -39,6 +39,7 @@
       <h1 class="logo">🐝 SpellMaster</h1>
       <p class="welcome">Hi, <span id="home-name"></span>! 👋</p>
       <p class="congrats" id="home-new" hidden>🎉 Your account was created — welcome to SpellMaster!</p>
+      <button type="button" id="home-bee" class="home-bee" title="Open the Bee Shop">🐝<span id="home-bee-acc"></span></button>
       <button type="button" id="level-widget" class="level-widget" hidden>
         <div class="level-top"><span id="level-rank"></span><span id="level-xp"></span></div>
         <div class="level-bar"><div id="level-fill" class="level-fill"></div></div>
@@ -59,7 +60,10 @@
           <button class="btn btn-secondary" id="btn-leaderboard">🏆 Top 10</button>
           <button class="btn btn-secondary" id="btn-history">📖 My History</button>
         </div>
-        <button class="btn btn-secondary" id="btn-trophies">🏆 Trophy Case</button>
+        <div class="home-row">
+          <button class="btn btn-secondary" id="btn-trophies">🏆 Trophy Case</button>
+          <button class="btn btn-secondary" id="btn-shop">🐝 Bee Shop</button>
+        </div>
         <button class="btn btn-secondary" id="btn-admin-feedback" hidden>🛠 Admin Panel</button>
         <button class="btn btn-ghost" id="btn-feedback">💬 Send Feedback</button>
         <button class="btn btn-ghost" id="btn-signout">Sign out</button>
@@ -218,7 +222,28 @@
         <p id="trophy-count" class="muted"></p>
         <div id="badge-grid" class="badge-grid"></div>
       </div>
+      <div class="card">
+        <h2>📔 Word Collection</h2>
+        <p id="collection-total" class="muted"></p>
+        <div id="collection-grid"></div>
+      </div>
       <button class="btn btn-secondary" id="btn-trophies-home">🏠 Home</button>
+    </section>
+
+    <!-- Bee Shop screen -->
+    <section id="screen-shop" class="screen" hidden>
+      <h1 class="logo small">🐝 Bee Shop</h1>
+      <div class="card shop-head">
+        <div class="shop-bee" id="shop-bee">🐝</div>
+        <div class="shop-coins">🪙 <span id="shop-coins">0</span> coins</div>
+        <button class="btn btn-ghost" id="btn-unequip" hidden>Take it off</button>
+        <p id="shop-msg" class="notice" hidden></p>
+      </div>
+      <div class="card">
+        <p class="muted">Spend coins (your lifetime points) on buddies for your bee. Buying never lowers your level!</p>
+        <div id="shop-grid" class="shop-grid"></div>
+      </div>
+      <button class="btn btn-secondary" id="btn-shop-home">🏠 Home</button>
     </section>
 
     <!-- Feedback screen -->

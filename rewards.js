@@ -35,6 +35,32 @@ const RANKS = [
   { min: 9000, icon: "👑", name: "Grand Master Speller" },
 ];
 
+// Tier 3: bee-buddy cosmetics. Prices mirror spelling._cosmetic_price (server
+// is authoritative). "Coins" are spendable = lifetime XP minus what's spent.
+const COSMETICS = {
+  cap:     { e: "🧢", n: "Ball Cap",    r: "Common",    price: 150 },
+  bow:     { e: "🎀", n: "Bow",         r: "Common",    price: 150 },
+  flower:  { e: "🌸", n: "Flower",      r: "Common",    price: 150 },
+  shades:  { e: "🕶️", n: "Cool Shades", r: "Uncommon",  price: 350 },
+  star:    { e: "⭐", n: "Gold Star",   r: "Uncommon",  price: 350 },
+  honey:   { e: "🍯", n: "Honey Pot",   r: "Uncommon",  price: 350 },
+  tophat:  { e: "🎩", n: "Top Hat",     r: "Rare",      price: 700 },
+  grad:    { e: "🎓", n: "Scholar Cap", r: "Rare",      price: 700 },
+  rainbow: { e: "🌈", n: "Rainbow",     r: "Rare",      price: 700 },
+  crown:   { e: "👑", n: "Royal Crown", r: "Epic",      price: 1500 },
+  cape:    { e: "🦸", n: "Super Cape",  r: "Epic",      price: 1500 },
+  rocket:  { e: "🚀", n: "Rocket Bee",  r: "Legendary", price: 3000 },
+  dragon:  { e: "🐉", n: "Dragon Pal",  r: "Legendary", price: 3000 },
+};
+const COSMETIC_ORDER = ["cap", "bow", "flower", "shades", "star", "honey", "tophat", "grad", "rainbow", "crown", "cape", "rocket", "dragon"];
+const RARITY_COLOR = { Common: "#64748b", Uncommon: "#10b981", Rare: "#4f46e5", Epic: "#a855f7", Legendary: "#f59e0b" };
+
+function beeAccessory(item) { return (COSMETICS[item] && COSMETICS[item].e) || ""; }
+
+// Words per grade in the bank (for the collection meter denominators).
+const WORDS_PER_GRADE = 120;
+const WORDS_TOTAL = 1440;
+
 // Returns { level, rank, next, intoLevel, span, pct } for an XP total.
 function rankFor(xp) {
   xp = Number(xp) || 0;

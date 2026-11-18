@@ -178,6 +178,37 @@ textarea { resize: vertical; font-size: 1rem; font-family: inherit; }
 .grade-chip.selected .cnt { color: var(--primary-dark); }
 .grade-chip:disabled { opacity: .45; cursor: default; }
 
+/* Tier 3: bee avatar, shop, collection */
+.home-bee {
+  display: block; margin: 0 auto 10px; border: none; background: transparent;
+  font-size: 3rem; line-height: 1; cursor: pointer; letter-spacing: -6px;
+}
+.home-bee:hover { transform: scale(1.08); }
+.home-bee #home-bee-acc { font-size: 2.1rem; }
+
+.shop-head { text-align: center; }
+.shop-bee { font-size: 3.4rem; line-height: 1; letter-spacing: -8px; margin-bottom: 6px; }
+.shop-bee span { font-size: 2.4rem; }
+.shop-coins { font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+
+.shop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+.shop-item {
+  border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center;
+}
+.shop-item .si-bee { font-size: 2.2rem; line-height: 1; letter-spacing: -6px; }
+.shop-item .si-bee span { font-size: 1.5rem; }
+.shop-item .si-name { font-weight: 700; font-size: .9rem; margin-top: 4px; }
+.shop-item .si-rarity { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.shop-item .btn { margin-top: 8px; padding: 8px 10px; font-size: .9rem; }
+.shop-item.equipped { border-color: var(--accent); background: linear-gradient(180deg, #fffbeb, #fff); }
+.btn-equipped { background: #fff; color: var(--accent); border: 1.5px solid #fde68a; }
+
+.collection-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; font-size: .9rem; }
+.collection-row .cg-label { width: 62px; flex-shrink: 0; font-weight: 600; }
+.collection-row .cg-bar { flex: 1; height: 9px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.collection-row .cg-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 999px; }
+.collection-row .cg-num { width: 54px; text-align: right; color: var(--ink-soft); flex-shrink: 0; }
+
 /* Tier 2: level bar + trophy case */
 .level-widget {
   display: block; width: 100%; text-align: left;

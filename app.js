@@ -154,8 +154,10 @@ $("btn-signout").addEventListener("click", () => {
   player = null;
   myRecommendations = [];
   myProfile = { xp: 0, games: 0, earned: [] };
+  myCosmetics = { coins: 0, owned: [] };
   $("btn-tutorials").textContent = "📚 Tutorials";
   $("level-widget").hidden = true;
+  $("home-bee-acc").textContent = "";
   $("auth-name").value = "";
   $("auth-pin").value = "";
   resetAuthMode();
@@ -170,8 +172,10 @@ function forceSignOut(message) {
   game = null;
   myRecommendations = [];
   myProfile = { xp: 0, games: 0, earned: [] };
+  myCosmetics = { coins: 0, owned: [] };
   $("btn-tutorials").textContent = "📚 Tutorials";
   $("level-widget").hidden = true;
+  $("home-bee-acc").textContent = "";
   $("auth-name").value = "";
   $("auth-pin").value = "";
   resetAuthMode();
@@ -205,6 +209,7 @@ function enterHome(isNew = false) {
   show("screen-home");
   refreshRecommendations(); // async: updates the Tutorials badge + new-lesson banner
   refreshProfile();         // async: updates the Speller Level widget
+  refreshCosmetics();       // async: updates the equipped bee + coin balance
 }
 
 $("grade-select").addEventListener("change", (e) => localStorage.setItem(GRADE_KEY, e.target.value));
@@ -846,7 +851,8 @@ function renderLeaderboard(tbody, rows, highlightScore) {
     const isMe = player && row.name === player.name && highlightScore !== null && Number(row.score) === highlightScore;
     if (isMe) tr.className = "me";
     const medal = ["🥇", "🥈", "🥉"][i] || `${i + 1}`;
-    tr.innerHTML = `<td>${medal}</td><td>${escapeHtml(row.name)}</td><td>${fmt(row.score)} / ${fmt(row.max_score)}</td><td>${row.played_on}</td>`;
+    const bee = row.bee ? ` ${beeAccessory(row.bee)}` : "";
+    tr.innerHTML = `<td>${medal}</td><td>${escapeHtml(row.name)}${bee}</td><td>${fmt(row.score)} / ${fmt(row.max_score)}</td><td>${row.played_on}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -889,7 +895,7 @@ function renderLevelWidget() {
   w.hidden = false;
 }
 
-function openTrophies() {
+async function openTrophies() {
   levelLine(rankFor(myProfile.xp), "trophy");
   const earned = new Set(myProfile.earned.map((b) => b.id));
   $("trophy-count").textContent = `${earned.size} of ${BADGE_ORDER.length} trophies earned`;
@@ -906,6 +912,10 @@ function openTrophies() {
     grid.appendChild(el);
   }
   show("screen-trophies");
+  try {
+    const col = await rpc("spelling", "get_collection", { p_player_id: player.id, p_pin: player.pin });
+    if (col.ok) renderCollection(col.grades);
+  } catch { /* leave collection empty on error */ }
 }
 
 function showNewBadges(ids) {
@@ -921,6 +931,129 @@ function showNewBadges(ids) {
 $("btn-trophies").addEventListener("click", openTrophies);
 $("btn-trophies-home").addEventListener("click", () => enterHome());
 $("level-widget").addEventListener("click", openTrophies);
+
+function renderCollection(grades) {
+  const byGrade = {};
+  let total = 0;
+  for (const g of grades) { byGrade[g.grade] = g.mastered; total += g.mastered; }
+  $("collection-total").textContent = `${total} of ${WORDS_TOTAL} words collected`;
+  const wrap = $("collection-grid");
+  wrap.innerHTML = "";
+  for (let gr = 1; gr <= 12; gr++) {
+    const m = byGrade[gr] || 0;
+    const pct = Math.round((m / WORDS_PER_GRADE) * 100);
+    const row = document.createElement("div");
+    row.className = "collection-row";
+    row.innerHTML = `<span class="cg-label">Grade ${gr}</span>` +
+      `<span class="cg-bar"><span class="cg-fill" style="width:${pct}%"></span></span>` +
+      `<span class="cg-num">${m}/${WORDS_PER_GRADE}</span>`;
+    wrap.appendChild(row);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 3: bee-buddy cosmetic shop. Coins = lifetime XP minus what's spent.
+// ---------------------------------------------------------------------------
+let myCosmetics = { coins: 0, owned: [] };
+
+function equippedItemId() {
+  const o = myCosmetics.owned.find((x) => x.equipped);
+  return o ? o.item : null;
+}
+
+function renderHomeBee() {
+  const el = $("home-bee-acc");
+  if (el) el.textContent = beeAccessory(equippedItemId());
+}
+
+async function refreshCosmetics() {
+  if (!player) return;
+  try {
+    const r = await rpc("spelling", "get_cosmetics", { p_player_id: player.id, p_pin: player.pin });
+    if (!r.ok) return;
+    myCosmetics = { coins: Number(r.coins) || 0, owned: r.owned || [] };
+  } catch { return; }
+  renderHomeBee();
+}
+
+let shopMsgTimer = null;
+function flashShopMsg(msg) {
+  const el = $("shop-msg");
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(shopMsgTimer);
+  shopMsgTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
+
+function renderShop() {
+  const owned = new Set(myCosmetics.owned.map((o) => o.item));
+  const equipped = equippedItemId();
+  $("shop-coins").textContent = fmt(myCosmetics.coins);
+  $("shop-bee").innerHTML = `🐝<span>${beeAccessory(equipped)}</span>`;
+  $("btn-unequip").hidden = !equipped;
+  const grid = $("shop-grid");
+  grid.innerHTML = "";
+  for (const id of COSMETIC_ORDER) {
+    const c = COSMETICS[id];
+    const has = owned.has(id);
+    const isEq = equipped === id;
+    const el = document.createElement("div");
+    el.className = "shop-item" + (isEq ? " equipped" : "");
+    const action = isEq ? `<button class="btn btn-equipped" disabled>✓ Wearing</button>`
+      : has ? `<button class="btn btn-primary" data-equip="${id}">Wear</button>`
+      : `<button class="btn btn-secondary" data-buy="${id}">🪙 ${c.price}</button>`;
+    el.innerHTML = `<div class="si-bee">🐝<span>${c.e}</span></div>` +
+      `<div class="si-name">${escapeHtml(c.n)}</div>` +
+      `<div class="si-rarity" style="color:${RARITY_COLOR[c.r]}">${c.r}</div>` + action;
+    grid.appendChild(el);
+  }
+  grid.querySelectorAll("[data-buy]").forEach((b) => b.addEventListener("click", () => buyItem(b.dataset.buy)));
+  grid.querySelectorAll("[data-equip]").forEach((b) => b.addEventListener("click", () => equipItem(b.dataset.equip, false)));
+}
+
+async function openShop() {
+  await refreshCosmetics();
+  renderShop();
+  show("screen-shop");
+}
+
+async function buyItem(id) {
+  try {
+    const r = await rpc("spelling", "buy_cosmetic", { p_player_id: player.id, p_pin: player.pin, p_item: id });
+    if (!r.ok) { flashShopMsg(r.error); return; }
+    myCosmetics.coins = Number(r.coins) || 0;
+    myCosmetics.owned.push({ item: id, equipped: false });
+    await equipItem(id, true); // auto-wear the new buddy
+    SFX.fanfare();
+    confetti({ count: 90 });
+  } catch { flashShopMsg("Couldn't reach the shop — try again."); }
+}
+
+async function equipItem(id, silent) {
+  try {
+    const r = await rpc("spelling", "equip_cosmetic", { p_player_id: player.id, p_pin: player.pin, p_item: id });
+    if (!r.ok) { flashShopMsg(r.error); return; }
+    myCosmetics.owned = myCosmetics.owned.map((o) => ({ item: o.item, equipped: o.item === id }));
+    renderShop();
+    renderHomeBee();
+    if (!silent) SFX.correct();
+  } catch { flashShopMsg("Couldn't reach the shop — try again."); }
+}
+
+async function unequipAll() {
+  try {
+    const r = await rpc("spelling", "equip_cosmetic", { p_player_id: player.id, p_pin: player.pin, p_item: "" });
+    if (!r.ok) return;
+    myCosmetics.owned = myCosmetics.owned.map((o) => ({ item: o.item, equipped: false }));
+    renderShop();
+    renderHomeBee();
+  } catch { /* ignore */ }
+}
+
+$("btn-shop").addEventListener("click", openShop);
+$("home-bee").addEventListener("click", openShop);
+$("btn-shop-home").addEventListener("click", () => enterHome());
+$("btn-unequip").addEventListener("click", unequipAll);
 
 let lastMode = "scored";
 
